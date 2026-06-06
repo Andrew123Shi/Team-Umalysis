@@ -1,0 +1,800 @@
+/* CharaList Modern Table Styling */
+
+/* Section header */
+.chara-list-section {
+    margin-bottom: 16px;
+}
+
+.chara-table-wrapper {
+    overflow-x: auto;
+    padding: 4px;
+}
+
+/* Modern table styling */
+.chara-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.9rem;
+    color: #e5e7eb;
+}
+
+.chara-table thead th {
+    background: linear-gradient(180deg, rgba(55, 65, 81, 0.9) 0%, rgba(31, 41, 55, 0.95) 100%);
+    color: #9ca3af;
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 10px 12px;
+    border-bottom: 2px solid rgba(99, 102, 241, 0.3);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    white-space: nowrap;
+    text-align: center;
+}
+
+.chara-table thead th:first-child {
+    border-top-left-radius: 8px;
+}
+
+.chara-table thead th:last-child {
+    border-top-right-radius: 8px;
+}
+
+/* Table body rows */
+.chara-table tbody tr {
+    transition: background 0.15s ease;
+    cursor: pointer;
+}
+
+.chara-table tbody tr:nth-child(odd) {
+    background: rgba(30, 35, 44, 0.5);
+}
+
+.chara-table tbody tr:nth-child(even) {
+    background: rgba(40, 45, 55, 0.5);
+}
+
+.chara-table tbody tr:hover {
+    background: rgba(99, 102, 241, 0.12);
+}
+
+.chara-table tbody tr.expanded {
+    background: rgba(99, 102, 241, 0.15);
+    border-left: 3px solid #6366f1;
+}
+
+.chara-table tbody td {
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    vertical-align: middle;
+    white-space: nowrap;
+    text-align: center;
+}
+
+/* Rank column special styling */
+.rank-cell {
+    font-weight: 700;
+    font-size: 1rem;
+    text-align: center;
+}
+
+.rank-cell.rank-1 {
+    color: #fbbf24;
+    text-shadow: 0 0 8px rgba(251, 191, 36, 0.4);
+}
+
+.rank-cell.rank-2 {
+    color: #9ca3af;
+}
+
+.rank-cell.rank-3 {
+    color: #cd7f32;
+}
+
+/* Character name styling */
+.chara-name-cell {
+    text-align: left;
+}
+
+.chara-name-primary {
+    font-weight: 600;
+    color: #f3f4f6;
+}
+
+
+.chara-viewer-name {
+    font-size: 0.75em;
+    color: #6b7280;
+    display: block;
+    margin-top: 2px;
+    text-align: left;
+}
+
+/* Stats cells */
+.stat-cell {
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+}
+
+/* Time display */
+.time-cell {
+    font-variant-numeric: tabular-nums;
+}
+
+.time-primary {
+    font-weight: 600;
+    color: #e5e7eb;
+}
+
+.time-secondary {
+    font-size: 0.85em;
+    color: #4b5563;
+    display: block;
+}
+
+/* Status indicators */
+.status-good {
+    color: #4ade80;
+    font-weight: 600;
+}
+
+.status-bad {
+    color: #f87171;
+    font-weight: 600;
+}
+
+
+/* Small badge styling */
+.mini-badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+.mini-badge.success {
+    background: rgba(34, 197, 94, 0.15);
+    color: #4ade80;
+}
+
+.mini-badge.danger {
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+}
+
+
+/* Info icon in headers */
+.header-info {
+    cursor: help;
+    margin-left: 4px;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+
+.header-info:hover {
+    opacity: 1;
+}
+
+/* Expand indicator */
+.expand-cell {
+    text-align: center;
+    color: #4b5563;
+    transition: color 0.2s;
+}
+
+.chara-table tbody tr:hover .expand-cell {
+    color: #9ca3af;
+}
+
+.expand-icon {
+    display: inline-block;
+    transition: transform 0.2s ease;
+}
+
+.expand-icon.expanded {
+    transform: rotate(180deg);
+}
+
+.expanded-content {
+    background: rgba(20, 24, 32, 0.8);
+    padding: 16px;
+    animation: fadeSlideIn 0.2s ease;
+}
+
+@keyframes fadeSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Skills table styling in expanded row */
+.expanded-content .table {
+    background: transparent;
+    font-size: 0.9rem;
+}
+
+.expanded-content .table td {
+    padding: 4px 10px;
+    border: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.expanded-content .table tr:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+
+/* Stat icon used in stats cell */
+.stat-icon {
+    width: 16px;
+    height: 16px;
+    margin-right: 2px;
+}
+
+/* Stat label wrapper (icon + value inline) */
+.stat-label-item {
+    margin-right: 8px;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .chara-table {
+        font-size: 0.8rem;
+    }
+
+    .chara-table thead th,
+    .chara-table tbody td {
+        padding: 6px 8px;
+    }
+}
+
+.dashboard-grid {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0;
+    background: transparent;
+    border-radius: 8px;
+}
+
+.dashboard-panel {
+    background: transparent;
+    border: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    box-shadow: none;
+}
+
+.panel-skills {
+    flex: 0 0 260px;
+    padding-right: 12px;
+}
+
+.panel-aptitudes {
+    flex: 0 0 250px;
+    padding-right: 12px;
+}
+
+.panel-inheritance {
+    flex: 1 1 350px;
+}
+
+.dashboard-panel-header {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #818cf8;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+}
+
+.dashboard-panel-header--footer {
+    margin-top: auto;
+    padding-top: 16px;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+/* Skills list styling */
+.skills-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    cursor: pointer;
+}
+
+.skill-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 4px 8px;
+    background: transparent;
+    border-radius: 6px;
+    border: none;
+    transition: background 0.2s;
+}
+
+.skill-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.skill-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    color: #e5e7eb;
+}
+
+.skill-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.skill-badge {
+    font-size: 0.75rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(34, 197, 94, 0.15);
+    color: #4ade80;
+    font-weight: 600;
+}
+
+.skill-badge.multiple {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+}
+
+.skill-badge.failed {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+}
+
+/* Support Deck Grid */
+.support-deck-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 75px);
+    justify-content: center;
+    gap: 10px;
+    margin-top: auto;
+}
+
+.support-card-wrapper {
+    position: relative;
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    transition: transform 0.2s ease;
+}
+
+.support-card-wrapper:hover {
+    transform: translateY(-2px);
+}
+
+.support-card-img {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.support-card-lb {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0, 0, 0, 0.75);
+    color: white;
+    font-size: 0.75rem;
+    font-weight: bold;
+    text-align: center;
+    padding: 2px 0;
+    backdrop-filter: blur(2px);
+}
+
+/* Parents panel adjustments */
+.parent-group-container {
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin-bottom: 12px;
+}
+
+.parent-group-container:last-child {
+    margin-bottom: 0;
+}
+
+.parent-images-flex {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.parent-img {
+    width: 56px;
+    height: 56px;
+    object-fit: contain;
+    border-radius: 4px;
+    background: transparent;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.factor-badge {
+    font-size: 0.85rem;
+    margin-right: 4px;
+    margin-bottom: 4px;
+    background: #1e232c;
+    border: 1px solid #374151;
+    padding: 4px 8px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.aptitude-container {
+    margin-bottom: 12px;
+    background: transparent;
+    padding: 0;
+    border: none;
+}
+
+/* Override alternating backgrounds for internal tables */
+.dashboard-grid .table tbody tr {
+    background: transparent !important;
+}
+
+.dashboard-grid .table tbody tr:hover {
+    background: transparent !important;
+}
+
+.dashboard-grid .table td {
+    border: none;
+}
+
+.skills-breakdown-hint {
+    font-size: 0.75em;
+    color: var(--text-muted, #9ca3af);
+    margin-left: auto;
+    font-weight: normal;
+}
+
+/* ── columns.tsx static styles ───────────────────────────── */
+
+/* InfoIcon */
+.col-info-icon {
+    cursor: help;
+    border-bottom: 1px dotted #fff;
+}
+
+/* StatsCell */
+.col-stats-grid {
+    line-height: 1.4;
+}
+
+.col-stat-sp-help {
+    cursor: help;
+}
+
+/* Shared small tooltip content */
+.col-tooltip-sm {
+    text-align: left;
+    font-size: 0.85em;
+}
+
+/* Character cell */
+.col-chara-ident {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.col-rank-icon {
+    height: 20px;
+    width: auto;
+}
+
+.col-chara-thumb {
+    height: 40px;
+    width: auto;
+    object-fit: contain;
+}
+
+/* Time diff */
+.col-time-diff {
+    color: #9ca3af;
+}
+
+/* Style / mood cell */
+.col-style-mood {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.col-mood-icon {
+    height: 40px;
+    width: auto;
+}
+
+/* Start delay cell */
+.col-start-delay {
+    line-height: 1.2;
+}
+
+/* Last spurt cell */
+.col-spurt-cell {
+    line-height: 1.3;
+}
+
+.col-spurt-help {
+    cursor: help;
+}
+
+.col-spurt-delay-val {
+    font-weight: 600;
+}
+
+.col-spurt-speed {
+    font-size: 0.85em;
+}
+
+.col-spurt-speed-label {
+    color: #e5e7eb;
+}
+
+.col-speed-ok {
+    color: #4ade80;
+}
+
+.col-speed-bad {
+    color: #f87171;
+}
+
+/* HP tooltip */
+.col-hp-tooltip {
+    text-align: left;
+    font-size: 0.85em;
+    line-height: 1.6;
+}
+
+.col-diff-pos {
+    color: #4ade80;
+}
+
+.col-diff-neg {
+    color: #f87171;
+}
+
+/* HP outcome cell */
+.col-hp-outcome {
+    line-height: 1.3;
+}
+
+.col-hp-deficit {
+    font-size: 0.85em;
+    color: #f87171;
+}
+
+.col-hp-survived {
+    font-size: 0.85em;
+    color: #4ade80;
+}
+
+/* Single-value cells */
+.col-dueling-time {
+    color: #fbbf24;
+}
+
+.col-downhill-time {
+    color: #60a5fa;
+}
+
+.col-downhill-cell {
+    line-height: 1.25;
+}
+
+.col-downhill-split {
+    font-size: 0.78em;
+    color: #94a3b8;
+    white-space: nowrap;
+}
+
+.col-pace-cell {
+    line-height: 1.3;
+}
+
+.col-pace-up {
+    color: #4ade80;
+}
+
+.col-pace-down {
+    color: #f87171;
+}
+
+.col-prediction-cell {
+    line-height: 1.25;
+}
+
+.col-prediction-primary {
+    display: block;
+    font-weight: 700;
+    color: #cbd5e1;
+}
+
+.col-prediction-primary.top {
+    color: #86efac;
+}
+
+.col-prediction-rank {
+    display: block;
+    font-size: 0.8em;
+    color: #94a3b8;
+}
+
+/* ── Late-heal warning ──────────────────────────────────── */
+
+@media (max-width: 1600px) {
+    .chara-table-wrapper--with-prediction .chara-table {
+        font-size: 0.84rem;
+    }
+
+    .chara-table-wrapper--with-prediction .chara-table thead th {
+        padding: 8px 9px;
+        font-size: 0.7rem;
+        letter-spacing: 0.02em;
+    }
+
+    .chara-table-wrapper--with-prediction .chara-table tbody td {
+        padding: 7px 9px;
+    }
+
+    .chara-table-wrapper--with-prediction .rank-cell {
+        font-size: 0.95rem;
+    }
+
+    .chara-table-wrapper--with-prediction .col-chara-ident {
+        gap: 4px;
+    }
+
+    .chara-table-wrapper--with-prediction .col-rank-icon {
+        height: 18px;
+    }
+
+    .chara-table-wrapper--with-prediction .col-chara-thumb {
+        height: 34px;
+    }
+
+    .chara-table-wrapper--with-prediction .chara-name-primary {
+        font-size: 0.96em;
+    }
+
+    .chara-table-wrapper--with-prediction .chara-viewer-name {
+        font-size: 0.7em;
+    }
+
+    .chara-table-wrapper--with-prediction .time-secondary {
+        font-size: 0.78em;
+    }
+
+    .chara-table-wrapper--with-prediction .col-prediction-primary {
+        font-size: 0.96em;
+    }
+
+    .chara-table-wrapper--with-prediction .col-prediction-rank {
+        font-size: 0.72em;
+    }
+
+    .chara-table-wrapper--with-prediction .col-mood-icon {
+        height: 32px;
+    }
+
+    .chara-table-wrapper--with-prediction .col-style-mood {
+        gap: 2px;
+    }
+
+    .chara-table-wrapper--with-prediction .col-start-delay,
+    .chara-table-wrapper--with-prediction .col-spurt-cell,
+    .chara-table-wrapper--with-prediction .col-hp-outcome,
+    .chara-table-wrapper--with-prediction .col-pace-cell {
+        font-size: 0.92em;
+    }
+
+    .chara-table-wrapper--with-prediction .mini-badge {
+        font-size: 0.64rem;
+        padding: 2px 5px;
+    }
+
+    .chara-table-wrapper--with-prediction .col-stats-grid {
+        font-size: 0.92em;
+        line-height: 1.25;
+    }
+
+    .chara-table-wrapper--with-prediction .stat-label-item {
+        margin-right: 5px;
+    }
+
+    .chara-table-wrapper--with-prediction .stat-icon {
+        width: 14px;
+        height: 14px;
+        margin-right: 1px;
+    }
+}
+
+@media (max-width: 1400px) {
+    .chara-table-wrapper--with-prediction .col-mood-icon {
+        height: 28px;
+    }
+
+    .chara-table-wrapper--with-prediction .col-stats-grid {
+        font-size: 0.88em;
+    }
+
+    .chara-table-wrapper--with-prediction .col-start-delay,
+    .chara-table-wrapper--with-prediction .col-spurt-cell,
+    .chara-table-wrapper--with-prediction .col-hp-outcome,
+    .chara-table-wrapper--with-prediction .col-pace-cell,
+    .chara-table-wrapper--with-prediction .col-prediction-cell {
+        font-size: 0.88em;
+    }
+}
+
+.late-heal-icon {
+    width: 14px;
+    height: 14px;
+    margin-left: 4px;
+    vertical-align: middle;
+    opacity: 0.9;
+}
+
+.late-heal-warning {
+    margin-top: 4px;
+    padding-top: 4px;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    color: #fbbf24;
+}
+
+.late-heal-warning-text {
+    color: #e5e7eb;
+}
+
+/* ── CharaCard ─────────────────────────────────────────────────────────────── */
+
+.cc-factor-level {
+    color: #9ca3af;
+}
+
+.cc-expand-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: inherit;
+    padding: 0 4px;
+    font-size: 0.75rem;
+    font-weight: bold;
+}
+
+.panel-skills .dashboard-panel-header {
+    cursor: pointer;
+    gap: 6px;
+}

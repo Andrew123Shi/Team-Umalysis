@@ -1,0 +1,124 @@
+import pako from "pako";
+import { create, fromBinary } from "@bufbuild/protobuf";
+import { Card, Chara, RaceInstance, SingleModeRank, Skill, SupportCard, TextData, UMDatabase, UMDatabaseSchema } from './data_pb';
+import GameDataLoader from "./GameDataLoader";
+
+class _UMDatabaseWrapper {
+    umdb: UMDatabase = create(UMDatabaseSchema);
+    charas: Record<number, Chara> = {};
+    cards: Record<number, Card> = {};
+    supportCards: Record<number, SupportCard> = {};
+    raceInstances: Record<number, RaceInstance> = {};
+    skills: Record<number, Skill> = {};
+    skillNeedPoints: Record<number, number> = {};
+    singleModeRanks: SingleModeRank[] = [];
+    textData: Record<number, Record<number, TextData>> = {};
+    // chara_id -> set of relation_type values that character belongs to
+    charaRelationTypes: Record<number, Set<number>> = {};
+    // relation_type -> relation_point
+    relationPoints: Record<number, number> = {};
+    // win_saddle_id -> race_instance_id (only single-race saddles)
+    winSaddleToRaceInstance: Record<number, number> = {};
+    // win_saddle_id -> array of race_instance_id (all races in the saddle)
+    winSaddleToRaceInstances: Record<number, number[]> = {};
+    // race_instance_id -> course_set_id (track/course ID used in GameDataLoader.courseData)
+    raceInstanceCourseSetId: Record<number, number> = {};
+    // support_card_id -> race bonus (from effect table + unique effect, type=15)
+    supportCardRaceBonus: Record<number, number> = {};
+    // support_card_id -> race bonus by limit break count (indices 0..4)
+    supportCardRaceBonusByLimitBreak: Record<number, number[]> = {};
+
+    initialize() {
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), 10000);
+        return fetch(import.meta.env.BASE_URL + 'data/umdb.binarypb.gz', { cache: 'no-cache', signal: controller.signal })
+            .then(response => {
+            if (!response.ok) {
+                throw new Error(`Failed to fetch data/umdb.binarypb.gz (${response.status} ${response.statusText})`);
+            }
+            return response.arrayBuffer();
+        })
+            .then((response) => {
+            window.clearTimeout(timeoutId);
+            this.umdb = fromBinary(UMDatabaseSchema, pako.inflate(new Uint8Array(response)));
+            this.supportCardRaceBonusByLimitBreak = {};
+
+            this.umdb.chara.forEach((chara) => this.charas[chara.id!] = chara);
+            this.umdb.card.forEach((card) => this.cards[card.id!] = card);
+            this.umdb.supportCard.forEach((card) => {
+                this.supportCards[card.id!] = card;
+                const lbBonuses = (card.raceBonusByLimitBreak ?? []).map((v) => Number(v) || 0);
+                if (lbBonuses.length > 0) {
+                    this.supportCardRaceBonusByLimitBreak[card.id!] = lbBonuses;
+                }
+                const maxLbBonus = lbBonuses && lbBonuses.length > 0 ? lbBonuses[lbBonuses.length - 1] : undefined;
+                this.supportCardRaceBonus[card.id!] = card.raceBonus ?? maxLbBonus ?? 0;
+            });
+
+            this.umdb.raceInstance.forEach((race) => {
+                this.raceInstances[race.id!] = race;
+                if (race.courseSetId) this.raceInstanceCourseSetId[race.id!] = race.courseSetId;
+            });
+
+            this.umdb.skill.forEach((skill) => this.skills[skill.id!] = skill);
+
+            this.umdb.singleModeSkillNeedPoint.forEach((entry) => {
+                this.skillNeedPoints[entry.id!] = entry.needSkillPoint!;
+            });
+
+            this.singleModeRanks = this.umdb.singleModeRank.slice();
+
+            this.umdb.textData.forEach((text) => {
+                if (!this.textData[text.category!]) {
+                    this.textData[text.category!] = {};
+                }
+                this.textData[text.category!][text.index!] = text;
+            });
+
+            this.umdb.successionRelation.forEach((r) => {
+                this.relationPoints[r.relationType!] = r.relationPoint!;
+            });
+
+            this.umdb.successionRelationMember.forEach((m) => {
+                const charaId = m.charaId!;
+                if (!this.charaRelationTypes[charaId]) {
+                    this.charaRelationTypes[charaId] = new Set();
+                }
+                this.charaRelationTypes[charaId].add(m.relationType!);
+            });
+
+            this.umdb.singleModeWinsSaddle.forEach((s) => {
+                if (s.raceInstanceId) this.winSaddleToRaceInstance[s.id!] = s.raceInstanceId;
+                this.winSaddleToRaceInstances[s.id!] = Array.from(s.raceInstanceIds);
+            });
+        }).catch((error) => {
+            window.clearTimeout(timeoutId);
+            throw error;
+        });
+    }
+
+    raceInstanceNameWithId = (raceInstanceId: number) =>
+        `${raceInstanceId} - ${this.raceInstances[raceInstanceId]?.name ?? 'Unknown race'}`;
+
+    skillName = (skillId: number) =>
+        this.skills[skillId]?.name ?? `Unknown Skill ${skillId}`;
+
+    skillNameWithEnglishFallback = (skillId: number) =>
+        this.skills[skillId]?.name
+        ?? GameDataLoader.getSkillNameFallback(skillId)?.enname
+        ?? `Unknown Skill ${skillId}`;
+
+    skillNameWithId = (skillId: number) =>
+        `[${skillId}] ${this.skills[skillId]?.name ?? 'Unknown Skill'}`;
+
+    skillNameWithIdEnglishFallback = (skillId: number) =>
+        `[${skillId}] ${this.skills[skillId]?.name
+        ?? GameDataLoader.getSkillNameFallback(skillId)?.enname
+        ?? 'Unknown Skill'}`;
+
+    getTextData = (category: number, index: number): TextData | undefined =>
+        this.textData[category]?.[index];
+}
+
+const UMDatabaseWrapper = new _UMDatabaseWrapper();
+export default UMDatabaseWrapper;

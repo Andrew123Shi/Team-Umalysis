@@ -1,0 +1,467 @@
+/* Help/info icon inline with toggle labels */
+.toggle-info-icon {
+    margin-left: 5px;
+    cursor: help;
+    color: var(--app-accent);
+    border-bottom: 1px dotted rgba(100, 181, 246, 0.7);
+}
+
+/* Keyboard key display */
+.kbd-key {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--app-text-primary);
+    padding: 2px 6px;
+    border-radius: 6px;
+    font-size: 0.85em;
+    border: 1px solid var(--app-border);
+}
+
+/* ClipMaker container */
+.clip-maker {
+    background: rgba(255, 255, 255, 0.045);
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius);
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+/* ClipMaker inputs (compact form controls) */
+.clip-maker-input {
+    padding: 4px 8px;
+    height: auto;
+    font-size: 0.85rem;
+}
+
+/* ClipMaker labels */
+.clip-maker-label {
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+
+/* InfoHover trigger button */
+.replay-info-btn {
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--app-border);
+    background: rgba(15, 23, 36, 0.76);
+    color: var(--app-text-primary);
+    backdrop-filter: blur(8px);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: help;
+    user-select: none;
+    white-space: nowrap;
+}
+
+/* InfoHover 'i' badge inside button */
+.replay-info-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 1px solid rgba(100, 181, 246, 0.45);
+    color: var(--app-accent);
+    margin-right: 6px;
+    font-size: 12px;
+    line-height: 1;
+}
+
+/* Frame input (inline editable number) */
+.frame-input-inline {
+    width: 60px;
+    background-color: rgba(255, 255, 255, 0.06);
+    color: var(--app-text-primary);
+    border: 1px solid var(--app-border);
+    border-radius: 6px;
+    padding: 0 4px;
+    font-size: inherit;
+}
+
+/* Clickable frame number display */
+.frame-number-clickable {
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+}
+
+/* Hover tooltip shown when mousing over a character on the replay canvas */
+.replay-horse-tooltip {
+    position: absolute;
+    background: rgba(9, 13, 20, 0.94);
+    color: var(--app-text-primary);
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius);
+    padding: 6px 10px;
+    font-size: 12px;
+    line-height: 1.6;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 20;
+}
+
+.replay-horse-tooltip-name {
+    font-weight: 700;
+    margin-bottom: 2px;
+}
+
+/* Character visibility list above the replay */
+.char-vis-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 8px 0 10px;
+}
+
+.char-vis-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 8px 2px 5px;
+    border-radius: 999px;
+    border: 1px solid var(--app-border);
+    background: rgba(255, 255, 255, 0.055);
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--app-text-secondary);
+    user-select: none;
+    white-space: nowrap;
+    transition: background 0.1s;
+}
+
+.char-vis-btn:hover {
+    background: rgba(100, 181, 246, 0.12);
+    color: var(--app-text-primary);
+}
+
+.char-vis-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.char-vis-btn.char-vis-dim {
+    opacity: 0.3;
+}
+
+.char-vis-btn.char-vis-hidden {
+    opacity: 0.25;
+    text-decoration: line-through;
+}
+
+.course-minimap-card {
+    width: min(100%, 230px);
+    padding: 8px;
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius-lg);
+    background: var(--app-gradient-panel);
+}
+
+.course-minimap-overlay {
+    position: absolute;
+    top: 42px;
+    left: 54px;
+    z-index: 12;
+    width: min(230px, calc(100% - 24px));
+    pointer-events: none;
+}
+
+.course-minimap-overlay .course-minimap-card {
+    width: 100%;
+    background: rgba(15, 23, 36, 0.88);
+    backdrop-filter: blur(10px);
+    box-shadow: var(--app-shadow);
+}
+
+.course-minimap-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.course-minimap-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--app-text-primary);
+    letter-spacing: 0.02em;
+}
+
+.course-minimap-track {
+    font-size: 0.72rem;
+    color: var(--app-accent);
+}
+
+.course-minimap-svg {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+.course-minimap-outline {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.12);
+    stroke-width: 6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.course-minimap-segment-straight {
+    fill: none;
+    stroke: rgba(106, 149, 166, 0.9);
+    stroke-width: 4.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.course-minimap-segment-corner {
+    fill: none;
+    stroke: rgba(192, 139, 91, 0.9);
+    stroke-width: 4.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.course-minimap-segment-straight-inactive {
+    fill: none;
+    stroke: rgba(106, 149, 166, 0.28);
+    stroke-width: 4.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.course-minimap-segment-corner-inactive {
+    fill: none;
+    stroke: rgba(192, 139, 91, 0.28);
+    stroke-width: 4.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.course-minimap-slope-up,
+.course-minimap-slope-down,
+.course-minimap-slope-end-up,
+.course-minimap-slope-end-down {
+    font-size: 10px;
+    font-weight: 700;
+    paint-order: stroke;
+    stroke: rgba(18, 24, 32, 0.95);
+    stroke-width: 2px;
+    stroke-linejoin: round;
+}
+
+.course-minimap-slope-up {
+    fill: #ff8a80;
+}
+
+.course-minimap-slope-down {
+    fill: #7dd3fc;
+}
+
+.course-minimap-slope-end-up {
+    fill: #ff8a80;
+}
+
+.course-minimap-slope-end-down {
+    fill: #7dd3fc;
+}
+
+.course-minimap-highlight {
+    fill: none;
+    stroke: #4fd1c5;
+    stroke-width: 5.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.course-minimap-marker {
+    fill: #ffd166;
+    stroke: rgba(0, 0, 0, 0.45);
+    stroke-width: 1.5;
+}
+
+/* Toolbar layout sections */
+.rr-toolbar-left {
+    flex: 0 1 auto;
+}
+
+.rr-toolbar-mid {
+    flex: 1 1 350px;
+    margin-top: 4px;
+}
+
+.rr-toolbar-right {
+    flex: 0 1 auto;
+}
+
+/* Track selector */
+.rr-track-label {
+    font-weight: 600;
+}
+
+.rr-track-select {
+    width: auto;
+    max-width: 240px;
+}
+
+.rr-track-status {
+    font-size: 0.85em;
+    min-height: 18px;
+    margin-top: 2px;
+}
+
+.rr-status-good {
+    color: #28a745;
+}
+
+.rr-status-warn {
+    color: darkorange;
+}
+
+/* View window controls */
+.rr-window-label {
+    white-space: nowrap;
+    font-weight: 600;
+    font-size: 0.95em;
+}
+
+.rr-window-input {
+    width: 65px;
+    margin-left: 8px;
+    margin-right: 4px;
+}
+
+.rr-unit-label {
+    color: #aaa;
+    font-size: 0.9em;
+}
+
+.rr-track-icons {
+    gap: 8px;
+}
+
+/* Toggles grid */
+.rr-toggles-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 8px 12px;
+}
+
+.rr-toggle-label {
+    font-size: 0.85em;
+    white-space: nowrap;
+}
+
+/* Legend row */
+.rr-legend-row {
+    gap: 10px;
+    font-size: 0.85em;
+}
+
+/* Frame display */
+.rr-frame-display {
+    font-size: 0.95em;
+    color: #ccc;
+    white-space: nowrap;
+}
+
+/* Chart container */
+.rr-chart-container {
+    position: relative;
+    height: 500px;
+}
+
+.rr-chart {
+    height: 500px;
+    width: 100%;
+}
+
+.rr-chart-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.rr-mobile-fullscreen-row {
+    display: none;
+    margin: 8px 0 6px;
+}
+
+.rr-fullscreen-target {
+    position: relative;
+}
+
+.rr-fullscreen-target.rr-fullscreen-target--fullscreen {
+    background: #0f1114;
+    padding: 8px;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.rr-fullscreen-target.rr-fullscreen-target--fullscreen .rr-chart-container,
+.rr-fullscreen-target.rr-fullscreen-target--fullscreen .rr-chart {
+    height: calc(100dvh - 96px) !important;
+    min-height: 280px;
+    flex: 1 1 auto;
+}
+
+.rr-fullscreen-target.rr-fullscreen-target--fullscreen .rr-playback-row {
+    margin-top: 0 !important;
+}
+
+.rr-fullscreen-exit {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 20;
+}
+
+/* ClipMaker flex groups */
+.clip-maker-group {
+    gap: 12px;
+}
+
+.clip-maker-inner {
+    gap: 6px;
+}
+
+.clip-maker-input-time {
+    width: 75px;
+}
+
+.clip-maker-input-speed {
+    width: 60px;
+}
+
+.clip-maker-input-fps {
+    width: auto;
+}
+
+/* InfoHover popover */
+.replay-info-popover {
+    max-width: 48ch;
+}
+
+.replay-info-title {
+    color: #f87171;
+}
+
+/* LegendItem label */
+.legend-item-label {
+    font-size: 12px;
+}
+
+@media (max-width: 768px) {
+    .rr-mobile-fullscreen-row {
+        display: flex;
+        justify-content: flex-end;
+    }
+}

@@ -1,0 +1,148 @@
+syntax = "proto2";
+
+package umdb;
+
+message UMDatabase {
+    optional string version = 1;
+
+    repeated Chara chara = 2;
+    repeated Card card = 9;
+    repeated SupportCard support_card = 11;
+    repeated RaceInstance race_instance = 4;
+
+    repeated Skill skill = 7;
+
+    repeated TextData text_data = 12;
+
+    repeated SingleModeSkillNeedPoint single_mode_skill_need_point = 13;
+
+    repeated SingleModeRank single_mode_rank = 14;
+
+    repeated SuccessionRelation succession_relation = 15;
+    repeated SuccessionRelationMember succession_relation_member = 16;
+
+    repeated SingleModeWinsSaddle single_mode_wins_saddle = 17;
+}
+
+message Chara {
+    optional int32 id = 1;
+    optional string name = 2;
+    optional string cast_name = 3;
+}
+
+message Card {
+    optional int32 id = 1;
+    optional string name = 2;
+}
+
+message SupportCard {
+    optional int32 id = 1;
+    optional string name = 2;
+    optional int32 chara_id = 3;
+    // Total race bonus from support_card_effect_table (type=15) + support_card_unique_effect (type=15)
+    optional int32 race_bonus = 4;
+    // Race bonus at each support-card limit break count, indices 0..4.
+    repeated int32 race_bonus_by_limit_break = 5;
+}
+
+message RaceInstance {
+    optional int32 id = 1;
+    optional string name = 2;
+    optional int32 distance = 3;
+
+    enum GroundType {
+        UNKNOWN_GROUND_TYPE = 0;
+        TURF = 1;
+        DIRT = 2;
+    }
+    optional GroundType ground_type = 4;
+
+    // race_course_set.id — the track/course ID used elsewhere (e.g. GameDataLoader.courseData)
+    optional int32 course_set_id = 5;
+}
+
+message SkillEffect {
+    optional int32 type = 1;
+    optional int32 value = 2;
+}
+
+message SkillConditionGroup {
+    optional string condition = 1;
+    optional int32 base_time = 2;
+    repeated SkillEffect effects = 3;
+}
+
+message Skill {
+    optional int32 id = 1;
+    optional string name = 2;
+    optional sint32 grade_value = 3;
+
+    // enum SingleModeDefine.SkillTag
+    //    RunningStyleBegin = 100;
+    //    Nige = 101;
+    //    Senko = 102;
+    //    Sashi = 103;
+    //    Oikomi = 104;
+    //    RunningStyleEnd = 199;
+    //    DistanceBegin = 200;
+    //    Short = 201;
+    //    Mile = 202;
+    //    Middle = 203;
+    //    Long = 204;
+    //    DistanceEnd = 299;
+    //    SPEED = 401;
+    //    STAMINA = 402;
+    //    POWER = 403;
+    //    GUTS = 404;
+    //    WIZ = 405;
+    //    DOWN = 406;
+    //    SPECIAL = 407;
+    //    GroundBegin = 500;
+    //    Turf = 501;
+    //    Dirt = 502;
+    //    GroundEnd = 599;
+    //    ScenarioBegin = 800;
+    //    ScenarioEnd = 899;
+    repeated string tag_id = 4;
+    optional int32 rarity = 5;
+    repeated SkillConditionGroup condition_groups = 6;
+    optional int32 icon_id = 7;
+}
+
+message TextData {
+    optional int32 id = 1;
+    optional int32 category = 2;
+    optional int32 index = 3;
+    optional string text = 4;
+}
+
+message SingleModeSkillNeedPoint {
+    optional int32 id = 1;
+    optional int32 need_skill_point = 2;
+    optional int32 status_type = 3;
+    optional int32 status_value = 4;
+    optional int32 solvable_type = 5;
+}
+
+message SingleModeRank {
+    optional int32 id = 1;
+    optional int32 min_value = 2;
+    optional int32 max_value = 3;
+}
+
+message SuccessionRelation {
+    optional int32 relation_type = 1;
+    optional int32 relation_point = 2;
+}
+
+message SuccessionRelationMember {
+    optional int32 id = 1;
+    optional int32 relation_type = 2;
+    optional int32 chara_id = 3;
+}
+
+message SingleModeWinsSaddle {
+    optional int32 id = 1;
+    optional int32 race_instance_id = 2;
+    repeated int32 race_instance_ids = 3;
+}

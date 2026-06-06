@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.umamoe-ref/
+.tmp/
+public/favicon.ico
+*.log
+.DS_Store
