@@ -14,15 +14,26 @@ import { RaceStoreProvider, useRaceStore } from './store/RaceStore';
 
 function AppHeader() {
     const [headerEl, setHeaderEl] = useState<HTMLDivElement | null>(null);
-    const { reload, loading, dataSource, index } = useRaceStore();
+    const { reload, loading, index, progress } = useRaceStore();
     useStickyOffset(headerEl, '--sticky-app-header-height');
+    const baseUrl = import.meta.env.BASE_URL;
+
+    const displayedFileCount = loading && progress.total > 0 ? progress.loaded : index.length;
+    const statusFileCount = loading && progress.total > 0
+        ? `${progress.loaded}/${progress.total}`
+        : String(displayedFileCount);
+    const statusDotClass = [
+        'app-status-dot',
+        loading ? 'is-loading' : '',
+        !loading && index.length > 0 ? 'is-ready' : '',
+    ].filter(Boolean).join(' ');
 
     return (
         <div ref={setHeaderEl} className="app-fixed-header">
             <Navbar variant="dark" expand="lg" className="app-nav">
                 <Container fluid>
                     <Navbar.Brand as={Link} to="/">
-                        <img src="/icon.ico" alt="" className="app-brand-mark" aria-hidden="true" />
+                        <img src={`${baseUrl}icon.ico`} alt="" className="app-brand-mark" aria-hidden="true" />
                         <span className="app-brand-text">Team Umalysis</span>
                     </Navbar.Brand>
                     <Navbar.Toggle aria-controls="nav" />
@@ -34,17 +45,17 @@ function AppHeader() {
                         </Nav>
                         <Nav>
                             <span className="navbar-text app-data-status me-3">
-                                <span className={`app-status-dot${index.length > 0 ? ' is-ready' : ''}`} aria-hidden="true" />
-                                {index.length > 0 ? (
+                                <span className={statusDotClass} aria-hidden="true" />
+                                {displayedFileCount > 0 ? (
                                     <>
-                                        <strong>{index.length}</strong>
-                                        {` Team Trials file${index.length === 1 ? '' : 's'} loaded from ${dataSource ?? 'unknown'}`}
+                                        <strong>{statusFileCount}</strong>
+                                        {` Team Trials file${displayedFileCount === 1 ? '' : 's'} loaded`}
                                     </>
                                 ) : (
-                                    'No Team Trials files loaded'
+                                    loading ? 'Loading Team Trials files...' : 'No Team Trials folder loaded'
                                 )}
                             </span>
-                            <Nav.Link onClick={() => reload()} className={loading ? 'disabled' : ''}>Reload Data</Nav.Link>
+                            <Nav.Link onClick={() => reload()} className={loading ? 'disabled' : ''}>Reload Folder</Nav.Link>
                         </Nav>
                     </Navbar.Collapse>
                 </Container>
@@ -107,7 +118,7 @@ function BootstrapGate({ children }: { children: React.ReactNode }) {
 
 export default function App() {
     return (
-        <BrowserRouter>
+        <BrowserRouter basename={import.meta.env.BASE_URL}>
             <BootstrapGate>
                 <RaceStoreProvider>
                     <div data-bs-theme="dark" className="app-shell">

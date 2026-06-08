@@ -1806,6 +1806,11 @@ body {
   color: var(--app-success);
 }
 
+.app-status-dot.is-loading {
+  background: var(--app-warning);
+  color: var(--app-warning);
+}
+
 .page-shell {
   padding-top: 1.25rem;
 }

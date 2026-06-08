@@ -29,12 +29,12 @@ const HISTORICAL_PLACEHOLDER_LABEL = 'Choose historical uma...';
 
 export default function DashboardPage() {
     const [tabsEl, setTabsEl] = useState<HTMLDivElement | null>(null);
-    const { sessions, loading, error } = useRaceStore();
+    const { sessions, loading, progress, error, hasTriedSavedFolder, loadFromFolder } = useRaceStore();
     const [selectedBuildKey, setSelectedBuildKey] = useState<string>(SUMMARY_VALUE);
     const [historicalSelection, setHistoricalSelection] = useState<string>(HISTORICAL_PLACEHOLDER);
     useStickyOffset(tabsEl, '--sticky-dashboard-tabs-height', true);
     const dashboardReady = useDashboardReady(sessions);
-    const showDashboardLoading = loading || (sessions.length > 0 && !dashboardReady);
+    const showDashboardLoading = sessions.length > 0 && !dashboardReady;
 
     const overallStats = useMemo(() => (sessions.length ? aggregateOverall(sessions) : null), [sessions]);
     const distanceStatsByType = useMemo(() => {
@@ -121,10 +121,24 @@ export default function DashboardPage() {
                     <div className="dashboard-tab-content">
                         <Alert variant="danger">{error}</Alert>
                     </div>
-                ) : !sessions.length && !loading ? (
+                ) : loading ? (
+                    <div className="dashboard-tab-content">
+                        <Alert variant="info" className="app-card dashboard-loading-alert">
+                            {progress.total > 0 ? `Loading ${progress.loaded}/${progress.total} files...` : 'Loading files...'}
+                        </Alert>
+                    </div>
+                ) : !sessions.length ? (
                     <div className="dashboard-tab-content">
                         <div className="app-card empty-state">
-                            No sessions loaded. Use Settings or Load Folder to import Team Trials JSON files.
+                            <h2 className="h4">Choose Your Team Trials Folder</h2>
+                            <p className="text-muted mb-3">
+                                {hasTriedSavedFolder
+                                    ? 'No Team Trials sessions are loaded yet. Select the folder where horseACT saves your TT-*.json files.'
+                                    : 'Checking for a remembered Team Trials folder...'}
+                            </p>
+                            <Button variant="primary" onClick={loadFromFolder}>
+                                Choose Team Trials Folder
+                            </Button>
                         </div>
                     </div>
                 ) : (
