@@ -5,6 +5,7 @@ import AssetLoader from '../../data/AssetLoader';
 import RatingDisplay from '../RatingDisplay';
 import TeamRatingDisplay from '../TeamRatingDisplay';
 import { chartTooltipStyle } from './chartTooltip';
+import { BAR_CHART_GRID, BAR_CHART_HEIGHT } from './chartLayout';
 
 type StatValues = {
     speed: number;
@@ -61,7 +62,7 @@ function buildOption(title: string, stats: StatValues) {
                 return `<b>${meta?.label ?? item.axisValue ?? ''}</b><br/><b>${item.marker ?? ''}${Math.round(item.value ?? 0)}</b>`;
             },
         },
-        grid: { left: 8, right: 8, top: 48, bottom: 24, containLabel: true },
+        grid: { ...BAR_CHART_GRID },
         xAxis: {
             type: 'category',
             data: STAT_META.map((stat) => stat.key),
@@ -146,8 +147,8 @@ function AverageStatsChart({
 
     return (
         <div className="average-stats-chart-block h-100">
-            <ReactECharts option={option} style={{ height: 240 }} />
-            <div className="average-stats-chart-footer">
+            <ReactECharts option={option} style={{ height: BAR_CHART_HEIGHT }} />
+            <div className={`average-stats-chart-footer${showTeamRating ? ' average-stats-chart-footer--opponent' : ''}`}>
                 <RatingDisplay rankScore={summary.rankScore} label="Avg. Uma Rating" />
                 {showTeamRating && summary.teamRating !== undefined && (
                     <TeamRatingDisplay teamRating={summary.teamRating} label="Avg. Team Rating" />
@@ -167,12 +168,14 @@ export default function AverageStatsComparisonChart({
     showTeamRating?: boolean;
 }) {
     return (
-        <div className="row g-3 average-stats-chart-row">
-            <div className="col-lg-6">
-                <AverageStatsChart title="Average Opponent Stats" summary={opponent} showTeamRating={showTeamRating} />
-            </div>
-            <div className="col-lg-6">
-                <AverageStatsChart title="Average NPC Stats" summary={npc} showTeamRating={false} />
+        <div className="opponent-bar-chart-panel">
+            <div className="row g-3 average-stats-chart-row opponent-bar-chart-row">
+                <div className="col-lg-6">
+                    <AverageStatsChart title="Average Opponent Stats" summary={opponent} showTeamRating={showTeamRating} />
+                </div>
+                <div className="col-lg-6">
+                    <AverageStatsChart title="Average NPC Stats" summary={npc} showTeamRating={false} />
+                </div>
             </div>
         </div>
     );

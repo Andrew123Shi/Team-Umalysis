@@ -5,13 +5,12 @@ import { Button, ButtonGroup } from 'react-bootstrap';
 import type { StyleComposition } from '../../analytics/types';
 import { STYLE_SATURATION_COLORS } from '../../analytics/styleSaturation';
 import { chartTooltipStyle } from './chartTooltip';
+import { BAR_CHART_GRID, STYLE_COMPOSITION_CHART_HEIGHT } from './chartLayout';
 
 type Mode = 'percent' | 'avgCount';
 
 const STYLE_AXIS_LABELS = ['Front /\nRunaway', 'Pace', 'Late', 'End'] as const;
 const STYLE_LABELS = ['Front/Runaway', 'Pace', 'Late', 'End'] as const;
-const CHART_GRID_TOP = 48;
-const CHART_HEIGHT = 240;
 const STYLE_IDS = [1, 2, 3, 4] as const;
 
 function fmtCount(value: number): string {
@@ -126,7 +125,7 @@ function buildOption({
                 ].join('<br/>');
             },
         },
-        grid: { left: 8, right: 8, top: CHART_GRID_TOP, bottom: 36, containLabel: true },
+        grid: { ...BAR_CHART_GRID },
         xAxis: {
             type: 'category',
             data: [...STYLE_AXIS_LABELS],
@@ -212,7 +211,7 @@ export default function StyleCompositionChart({
     );
     const roomOption = useMemo(
         () => buildOption({
-            title: 'Full Room',
+            title: 'Full Field',
             comp: roomComp,
             altComp: roomAlt,
             mode: roomMode,
@@ -222,48 +221,58 @@ export default function StyleCompositionChart({
     );
 
     return (
-        <div className="row g-3 average-stats-chart-row">
-            <div className={COL_THIRD}>
-                <div className="composition-chart-toolbar" />
-                <ReactECharts option={oppOption} style={{ height: CHART_HEIGHT }} />
-            </div>
-            <div className={COL_THIRD}>
-                <div className="composition-chart-toolbar">
-                    <ButtonGroup size="sm">
-                        <Button
-                            variant={npcMode === 'avgCount' ? 'secondary' : 'outline-secondary'}
-                            onClick={() => setNpcMode('avgCount')}
-                        >
-                            Avg Count
-                        </Button>
-                        <Button
-                            variant={npcMode === 'percent' ? 'secondary' : 'outline-secondary'}
-                            onClick={() => setNpcMode('percent')}
-                        >
-                            Percent
-                        </Button>
-                    </ButtonGroup>
+        <div className="opponent-bar-chart-panel">
+            <div className="row g-3 opponent-bar-chart-toolbar-row">
+                <div className={COL_THIRD}>
+                    <div className="composition-chart-toolbar" />
                 </div>
-                <ReactECharts option={npcOption} style={{ height: CHART_HEIGHT }} />
-            </div>
-            <div className={COL_THIRD}>
-                <div className="composition-chart-toolbar">
-                    <ButtonGroup size="sm">
-                        <Button
-                            variant={roomMode === 'avgCount' ? 'secondary' : 'outline-secondary'}
-                            onClick={() => setRoomMode('avgCount')}
-                        >
-                            Avg Count
-                        </Button>
-                        <Button
-                            variant={roomMode === 'percent' ? 'secondary' : 'outline-secondary'}
-                            onClick={() => setRoomMode('percent')}
-                        >
-                            Percent
-                        </Button>
-                    </ButtonGroup>
+                <div className={COL_THIRD}>
+                    <div className="composition-chart-toolbar">
+                        <ButtonGroup size="sm">
+                            <Button
+                                variant={npcMode === 'avgCount' ? 'secondary' : 'outline-secondary'}
+                                onClick={() => setNpcMode('avgCount')}
+                            >
+                                Avg Count
+                            </Button>
+                            <Button
+                                variant={npcMode === 'percent' ? 'secondary' : 'outline-secondary'}
+                                onClick={() => setNpcMode('percent')}
+                            >
+                                Percent
+                            </Button>
+                        </ButtonGroup>
+                    </div>
                 </div>
-                <ReactECharts option={roomOption} style={{ height: CHART_HEIGHT }} />
+                <div className={COL_THIRD}>
+                    <div className="composition-chart-toolbar">
+                        <ButtonGroup size="sm">
+                            <Button
+                                variant={roomMode === 'avgCount' ? 'secondary' : 'outline-secondary'}
+                                onClick={() => setRoomMode('avgCount')}
+                            >
+                                Avg Count
+                            </Button>
+                            <Button
+                                variant={roomMode === 'percent' ? 'secondary' : 'outline-secondary'}
+                                onClick={() => setRoomMode('percent')}
+                            >
+                                Percent
+                            </Button>
+                        </ButtonGroup>
+                    </div>
+                </div>
+            </div>
+            <div className="row g-3 average-stats-chart-row opponent-bar-chart-row">
+                <div className={COL_THIRD}>
+                    <ReactECharts option={oppOption} style={{ height: STYLE_COMPOSITION_CHART_HEIGHT }} />
+                </div>
+                <div className={COL_THIRD}>
+                    <ReactECharts option={npcOption} style={{ height: STYLE_COMPOSITION_CHART_HEIGHT }} />
+                </div>
+                <div className={COL_THIRD}>
+                    <ReactECharts option={roomOption} style={{ height: STYLE_COMPOSITION_CHART_HEIGHT }} />
+                </div>
             </div>
         </div>
     );

@@ -87,7 +87,7 @@ export default function ScoreBreakdownPanel({ breakdown }: { breakdown: ScoreBre
             label: 'Unique Skill Activation Rate',
             value: fmtPct(breakdown.uniqueSkillActivationRate),
             score: formatScore(breakdown.avgUniqueSkillPoints),
-            detail: 'Percent of learned unique skills that activated',
+            detail: 'Share of races where the unique skill was activated',
         },
         {
             label: 'Gold Skill Activations, per Race',

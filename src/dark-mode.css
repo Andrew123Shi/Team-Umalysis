@@ -724,10 +724,23 @@ body {
   align-items: center;
   justify-content: center;
   gap: 0.45rem 1.1rem;
-  margin-top: -0.55rem;
+  margin-top: -1.55rem;
   color: var(--app-text-primary);
   font-size: 0.95rem;
   font-weight: 800;
+}
+
+.average-stats-chart-footer--opponent {
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  margin-top: -1.55rem;
+  padding-left: 1.35rem;
+  gap: 0.45rem 2rem;
+}
+
+.average-stats-chart-footer--opponent .rating-display {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .average-stats-chart-footer .rating-display {
@@ -759,8 +772,32 @@ body {
   justify-content: flex-end;
 }
 
+.opponent-bar-chart-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.opponent-bar-chart-toolbar-row {
+  margin-bottom: 0 !important;
+}
+
+.opponent-bar-chart-row {
+  margin-top: 0 !important;
+}
+
+.opponent-characteristics-layout > [class*="col-"] {
+  display: flex;
+}
+
 .opponent-characteristics-card.card.app-card {
   overflow: visible;
+  flex: 1;
+}
+
+.opponent-characteristics-card .card-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
 }
 
 .historical-uma-section {
