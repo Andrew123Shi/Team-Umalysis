@@ -30,10 +30,7 @@ function isInheritedSkill(skillId: number): boolean {
 }
 
 function hasUniqueFlag(skillId: number, skill: Skill): boolean {
-    if (skillId < 200000) return true;
-    if (isInheritedSkill(skillId)) return true;
-    if (skill.rarity === 4) return true;
-    return false;
+    return skill.rarity === 4 || skill.rarity === 5 || isInheritedSkill(skillId);
 }
 
 function getSkillText(skill: Skill): string {
@@ -66,7 +63,7 @@ function getSkillSortBucket(skillId: number): number {
     }
 
     const typeRank = getSkillTypeRank(skill);
-    if (skill.rarity === 2 || skill.rarity === 4) return 2 + typeRank;
+    if (skill.rarity === 2) return 2 + typeRank;
     return 6 + typeRank;
 }
 
@@ -89,7 +86,6 @@ export function getProfileSkillRarityClass(skillId: number): string {
             ? 'rarity-unique-inherited'
             : 'rarity-gold rarity-unique-main';
     }
-    if (skill.rarity === 3) return 'rarity-special';
     if (skill.rarity === 2) return 'rarity-gold';
     return '';
 }

@@ -22,6 +22,104 @@ import {
 import { DISTANCE_LABELS as DISTANCE_MAP } from '../analytics/types';
 
 const RUNAWAY_TRIGGER_SKILL_ID = 202051;
+const METERS_PER_LENGTH = 2.5;
+
+function bisectFrameIndex(frames: ParsedRaceView['raceData']['frame'], time: number): number {
+    if (frames.length === 0) return 0;
+    const last = frames.length - 1;
+    if (time <= (frames[0].time ?? 0)) return 0;
+    if (time >= (frames[last].time ?? 0)) return last;
+
+    let left = 0;
+    let right = last;
+    while (left <= right) {
+        const mid = Math.floor((left + right) / 2);
+        if ((frames[mid].time ?? 0) < time) {
+            left = mid + 1;
+        } else {
+            right = mid - 1;
+        }
+    }
+    return left;
+}
+
+function interpolateDistance(
+    frames: ParsedRaceView['raceData']['frame'],
+    frameOrder: number,
+    time: number,
+): number {
+    if (frames.length === 0) return 0;
+    const right = bisectFrameIndex(frames, time);
+    const left = Math.max(0, right - 1);
+    const f1 = frames[left];
+    const f2 = frames[right];
+    if (!f1 || !f2) return 0;
+
+    const t1 = f1.time ?? 0;
+    const t2 = f2.time ?? 0;
+    const d1 = f1.horseFrame?.[frameOrder]?.distance ?? 0;
+    const d2 = f2.horseFrame?.[frameOrder]?.distance ?? 0;
+    if (t2 === t1) return d1;
+    return d1 + (d2 - d1) * ((time - t1) / (t2 - t1));
+}
+
+function calculateRaceDistance(raceData: ParsedRaceView['raceData']): number {
+    const frames = raceData.frame ?? [];
+    let winnerIndex = -1;
+    let winnerFinish = Number.POSITIVE_INFINITY;
+    (raceData.horseResult ?? []).forEach((horseResult, index) => {
+        const finish = horseResult?.finishTimeRaw;
+        if (typeof finish === 'number' && finish > 0 && finish < winnerFinish) {
+            winnerFinish = finish;
+            winnerIndex = index;
+        }
+    });
+
+    if (winnerIndex >= 0 && frames.length > 0 && Number.isFinite(winnerFinish)) {
+        const frameIndex = bisectFrameIndex(frames, winnerFinish);
+        const distance = frames[frameIndex]?.horseFrame?.[winnerIndex]?.distance ?? 0;
+        return Math.round(distance / 100) * 100;
+    }
+
+    return raceData.header?.maxLength ?? 0;
+}
+
+function computeWinnerMarginLengths(
+    raceData: ParsedRaceView['raceData'],
+    raceHorseInfo: any[],
+): Map<number, number> {
+    const ordered = raceHorseInfo
+        .map((horse) => {
+            const frameOrder = Number(horse.frame_order) - 1;
+            const result = Number.isFinite(frameOrder) ? raceData.horseResult?.[frameOrder] : undefined;
+            return {
+                trainedCharaId: Number(horse.trained_chara_id),
+                frameOrder,
+                finishOrder: Number(horse.finish_order),
+                finishTimeRaw: result?.finishTimeRaw ?? Number(horse.finish_time ?? 0),
+            };
+        })
+        .filter((entry) => (
+            Number.isFinite(entry.trainedCharaId)
+            && Number.isFinite(entry.frameOrder)
+            && entry.frameOrder >= 0
+            && Number.isFinite(entry.finishOrder)
+        ))
+        .sort((a, b) => a.finishOrder - b.finishOrder);
+
+    const winner = ordered[0];
+    const second = ordered[1];
+    if (!winner || !second || winner.finishOrder !== 1 || !Number.isFinite(winner.finishTimeRaw) || winner.finishTimeRaw <= 0) {
+        return new Map();
+    }
+
+    const raceDistance = calculateRaceDistance(raceData);
+    if (raceDistance <= 0) return new Map();
+
+    const secondDistanceAtWinnerFinish = interpolateDistance(raceData.frame ?? [], second.frameOrder, winner.finishTimeRaw);
+    const marginMeters = Math.max(0, raceDistance - secondDistanceAtWinnerFinish);
+    return new Map([[winner.trainedCharaId, marginMeters / METERS_PER_LENGTH]]);
+}
 
 function getCourseAptitudeFilters(courseId: number | undefined): { ground: number; distance: number } | null {
     if (!courseId) return null;
@@ -67,7 +165,12 @@ function extractActivatedSkills(raceData: ParsedRaceView['raceData'], frameOrder
     return filterCharaSkills(raceData, frameIdx).map((event) => event.param[1]);
 }
 
-function buildUmaEntry(horse: any, charaResult: any, raceData: ParsedRaceView['raceData']): UmaEntry {
+function buildUmaEntry(
+    horse: any,
+    charaResult: any,
+    raceData: ParsedRaceView['raceData'],
+    winMarginLengths?: number,
+): UmaEntry {
     const trained = fromRaceHorseData(horse);
     const charaId = trained.charaId;
     const charaData = UMDatabaseWrapper.charas[charaId];
@@ -114,6 +217,7 @@ function buildUmaEntry(horse: any, charaResult: any, raceData: ParsedRaceView['r
         skills: trained.skills,
         finishOrder: Number(charaResult?.finish_order ?? 99),
         finishTime: Number(charaResult?.finish_time ?? 0),
+        ...(winMarginLengths !== undefined ? { winMarginLengths } : {}),
         totalScore: scoreEvents.reduce((sum, e) => sum + e.score, 0),
         scoreEvents,
         activatedSkillIds: extractActivatedSkills(raceData, frameOrder),
@@ -228,6 +332,7 @@ export function parseTeamTrialSession(json: any, fileName: string): TTSession | 
         const charaResults = result.chara_result_array ?? [];
         const resultById = new Map<number, any>();
         charaResults.forEach((cr: any) => resultById.set(Number(cr.trained_chara_id), cr));
+        const winMarginsByTrainedCharaId = computeWinnerMarginLengths(parsed.raceData, parsed.raceHorseInfo);
 
         const playerUmas: UmaEntry[] = [];
         const opponentUmas: UmaEntry[] = [];
@@ -238,7 +343,12 @@ export function parseTeamTrialSession(json: any, fileName: string): TTSession | 
                 (h: any) => Number(h.trained_chara_id) === Number(horse.trained_chara_id),
             ) ?? horse;
             const charaResult = resultById.get(Number(horse.trained_chara_id));
-            const entry = buildUmaEntry(hydrated, charaResult, parsed.raceData);
+            const entry = buildUmaEntry(
+                hydrated,
+                charaResult,
+                parsed.raceData,
+                winMarginsByTrainedCharaId.get(Number(horse.trained_chara_id)),
+            );
             if (entry.teamId === playerIdentity.teamId) playerUmas.push(entry);
             else if (entry.teamId === opponentTeamId) opponentUmas.push(entry);
             else npcUmas.push(entry);

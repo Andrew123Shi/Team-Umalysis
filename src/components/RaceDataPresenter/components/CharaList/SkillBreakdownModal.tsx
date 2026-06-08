@@ -318,7 +318,7 @@ const SkillBreakdownModal: React.FC<SkillBreakdownModalProps> = ({ show, onHide,
                                                     const ePct = Math.min(100, Math.max(0, (e.endDistance / totalDistance) * 100));
                                                     const wPct = Math.max(0, ePct - sPct);
                                                     const skillDef = getSkillDef(e.skillId);
-                                                    const isGold = skillDef?.rarity === 2 || skillDef?.rarity === 3;
+                                                    const isGold = skillDef?.rarity === 2;
 
                                                     return wPct > 0 ? (
                                                         <div key={`gseg-${i}`} style={{
@@ -339,7 +339,7 @@ const SkillBreakdownModal: React.FC<SkillBreakdownModalProps> = ({ show, onHide,
                         }
 
                         const skillDef = getSkillDef(evt.skillId);
-                        const isGold = skillDef?.rarity === 2 || skillDef?.rarity === 3;
+                        const isGold = skillDef?.rarity === 2;
                         const iconId = evt.iconId ?? skillDef?.iconId;
                         const iconFolder = iconId ? getSkillIconFolderByIconId(iconId) : undefined;
                         const iconUrl = iconId ? AssetLoader.getSkillIcon(iconId, iconFolder) : null;

@@ -47,6 +47,9 @@ export type ScoreBreakdownSummary = {
     avgGoldSkillActivations: number;
     goldSkillActivationRate: number;
     avgGoldSkillPoints: number;
+    avgUniqueSkillActivations: number;
+    uniqueSkillActivationRate: number;
+    avgUniqueSkillPoints: number;
     beatTargetTimeRate: number;
     avgBeatTargetTimeBonus: number;
     rushedOccurrenceRate: number;
@@ -86,6 +89,7 @@ export type UmaEntry = {
     skills: SkillRef[];
     finishOrder: number;
     finishTime: number;
+    winMarginLengths?: number;
     totalScore: number;
     scoreEvents: ScoreEvent[];
     activatedSkillIds: number[];
@@ -332,8 +336,11 @@ export type UmaComparisonEntry = {
     scoreBreakdown: ScoreBreakdownSummary;
     avgGoldSkillActivations: number;
     avgRegularSkillActivations: number;
+    avgUniqueSkillActivations: number;
     totalGoldSkillActivations: number;
     totalRegularSkillActivations: number;
+    totalUniqueSkillActivations: number;
     totalGoldSkillChances: number;
     totalRegularSkillChances: number;
+    totalUniqueSkillChances: number;
 };

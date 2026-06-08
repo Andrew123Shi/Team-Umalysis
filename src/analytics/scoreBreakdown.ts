@@ -1,5 +1,5 @@
 import type { ScoreBreakdownSummary, ScoreEvent, UmaEntry } from './types';
-import { isGoldSkill } from './skillUtils';
+import { getSkillRarityCategory } from './skillUtils';
 
 /** Finish position base scores (1st–12th). */
 const FINISH_POSITION_IDS = new Set([
@@ -11,36 +11,11 @@ const WIN_MARGIN_IDS = new Set([
     5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 21, 41, 51, 74, 75, 76, 77, 78, 80,
 ]);
 
-/** Margin to 2nd place in lengths (バ身), from team stadium score raw IDs. */
-const WIN_MARGIN_LENGTH_BY_ID: Record<number, number> = {
-    5: 7,
-    6: 6,
-    7: 5,
-    8: 4,
-    9: 3.5,
-    10: 3,
-    11: 2.5,
-    12: 2,
-    13: 1.75,
-    14: 1.5,
-    15: 1.25,
-    16: 1,
-    17: 0.75,
-    21: 0.25,
-    41: 9,
-    51: 9,
-    74: 3,
-    75: 2.5,
-    76: 2,
-    77: 1.75,
-    78: 1.5,
-    80: 1,
-};
-
 const GOOD_MID_POSITION_IDS = new Set([58]);
 const GOOD_LATE_POSITION_IDS = new Set([59]);
 const STRONG_START_IDS = new Set([25]);
 
+const UNIQUE_SKILL_ID = 55;
 const GOLD_SKILL_ID = 56;
 const REGULAR_SKILL_ID = 57;
 
@@ -52,27 +27,47 @@ const BEAT_TARGET_TIME_IDS = new Set([
 const RUSHED_FLAT_ID = 23;
 const RUSHED_PER_SECOND_ID = 24;
 
-export function countLearnedSkills(entry: UmaEntry): { gold: number; regular: number } {
+export function countLearnedSkills(entry: UmaEntry): { gold: number; regular: number; unique: number } {
     let gold = 0;
     let regular = 0;
+    let unique = 0;
     const seen = new Set<number>();
     entry.skills.forEach(({ skillId }) => {
         if (seen.has(skillId)) return;
         seen.add(skillId);
-        if (isGoldSkill(skillId)) gold += 1;
-        else regular += 1;
+        switch (getSkillRarityCategory(skillId)) {
+            case 'gold':
+                gold += 1;
+                break;
+            case 'unique':
+                unique += 1;
+                break;
+            case 'regular':
+                regular += 1;
+                break;
+        }
     });
-    return { gold, regular };
+    return { gold, regular, unique };
 }
 
-export function countSkillActivations(entry: UmaEntry): { gold: number; regular: number } {
+export function countSkillActivations(entry: UmaEntry): { gold: number; regular: number; unique: number } {
     let gold = 0;
     let regular = 0;
+    let unique = 0;
     entry.activatedSkillIds.forEach((skillId) => {
-        if (isGoldSkill(skillId)) gold += 1;
-        else regular += 1;
+        switch (getSkillRarityCategory(skillId)) {
+            case 'gold':
+                gold += 1;
+                break;
+            case 'unique':
+                unique += 1;
+                break;
+            case 'regular':
+                regular += 1;
+                break;
+        }
     });
-    return { gold, regular };
+    return { gold, regular, unique };
 }
 
 export function scoreEventBaseScore(event: ScoreEvent): number {
@@ -80,14 +75,23 @@ export function scoreEventBaseScore(event: ScoreEvent): number {
     return event.score;
 }
 
-function winMarginLengthFromId(rawScoreId: number): number | null {
-    return WIN_MARGIN_LENGTH_BY_ID[rawScoreId] ?? null;
+function uniqueSkillActivationPoints(entry: UmaEntry): number {
+    const uniqueLevels = new Map(
+        entry.skills
+            .filter(({ skillId }) => getSkillRarityCategory(skillId) === 'unique')
+            .map(({ skillId, level }) => [skillId, Math.max(0, Math.floor(Number(level) || 0))]),
+    );
+
+    return entry.activatedSkillIds.reduce((total, skillId) => {
+        const level = uniqueLevels.get(skillId);
+        if (level === undefined) return total;
+        return total + 2000 + level * 100;
+    }, 0);
 }
 
 export type RaceScoreBreakdown = {
     finishPositionScore: number;
     winMarginBonus: number;
-    winMarginLength: number | null;
     hasGoodMidPosition: boolean;
     goodMidPositionScore: number;
     hasGoodLatePosition: boolean;
@@ -96,6 +100,7 @@ export type RaceScoreBreakdown = {
     strongStartScore: number;
     goldSkillPoints: number;
     regularSkillPoints: number;
+    uniqueSkillPoints: number;
     beatTargetTimeBonus: number;
     hasBeatTargetTime: boolean;
     rushedFlatPenalty: number;
@@ -108,7 +113,6 @@ export function breakdownRaceScoreEvents(events: ScoreEvent[]): RaceScoreBreakdo
     const result: RaceScoreBreakdown = {
         finishPositionScore: 0,
         winMarginBonus: 0,
-        winMarginLength: null,
         hasGoodMidPosition: false,
         goodMidPositionScore: 0,
         hasGoodLatePosition: false,
@@ -117,6 +121,7 @@ export function breakdownRaceScoreEvents(events: ScoreEvent[]): RaceScoreBreakdo
         strongStartScore: 0,
         goldSkillPoints: 0,
         regularSkillPoints: 0,
+        uniqueSkillPoints: 0,
         beatTargetTimeBonus: 0,
         hasBeatTargetTime: false,
         rushedFlatPenalty: 0,
@@ -135,8 +140,6 @@ export function breakdownRaceScoreEvents(events: ScoreEvent[]): RaceScoreBreakdo
         }
         if (WIN_MARGIN_IDS.has(id)) {
             result.winMarginBonus += base;
-            const length = winMarginLengthFromId(id);
-            if (length !== null) result.winMarginLength = length;
             return;
         }
         if (GOOD_MID_POSITION_IDS.has(id)) {
@@ -152,6 +155,10 @@ export function breakdownRaceScoreEvents(events: ScoreEvent[]): RaceScoreBreakdo
         if (STRONG_START_IDS.has(id)) {
             result.hasStrongStart = true;
             result.strongStartScore += base;
+            return;
+        }
+        if (id === UNIQUE_SKILL_ID) {
+            result.uniqueSkillPoints += base;
             return;
         }
         if (id === GOLD_SKILL_ID) {
@@ -199,10 +206,13 @@ export function aggregateScoreBreakdown(entries: UmaEntry[]): ScoreBreakdownSumm
     let strongStartTotal = 0;
     let goldSkillTotal = 0;
     let regularSkillTotal = 0;
+    let uniqueSkillTotal = 0;
     let totalGoldSkillActivations = 0;
     let totalRegularSkillActivations = 0;
+    let totalUniqueSkillActivations = 0;
     let totalGoldSkillChances = 0;
     let totalRegularSkillChances = 0;
+    let totalUniqueSkillChances = 0;
     let beatTargetCount = 0;
     let rushedCount = 0;
     let beatTargetTotal = 0;
@@ -216,7 +226,9 @@ export function aggregateScoreBreakdown(entries: UmaEntry[]): ScoreBreakdownSumm
         finishPositionTotal += race.finishPositionScore;
         if (entry.finishOrder === 1 && race.winMarginBonus > 0) {
             winMarginBonuses.push(race.winMarginBonus);
-            if (race.winMarginLength !== null) winMarginLengths.push(race.winMarginLength);
+            if (entry.winMarginLengths !== undefined) {
+                winMarginLengths.push(entry.winMarginLengths);
+            }
         }
         if (race.hasGoodMidPosition) goodMidCount += 1;
         goodMidTotal += race.goodMidPositionScore;
@@ -224,14 +236,19 @@ export function aggregateScoreBreakdown(entries: UmaEntry[]): ScoreBreakdownSumm
         goodLateTotal += race.goodLatePositionScore;
         if (race.hasStrongStart) strongStartCount += 1;
         strongStartTotal += race.strongStartScore;
-        goldSkillTotal += race.goldSkillPoints;
-        regularSkillTotal += race.regularSkillPoints;
         const activations = countSkillActivations(entry);
         const learned = countLearnedSkills(entry);
+        goldSkillTotal += race.goldSkillPoints;
+        regularSkillTotal += race.regularSkillPoints;
+        uniqueSkillTotal += race.uniqueSkillPoints > 0
+            ? race.uniqueSkillPoints
+            : uniqueSkillActivationPoints(entry);
         totalGoldSkillActivations += activations.gold;
         totalRegularSkillActivations += activations.regular;
+        totalUniqueSkillActivations += activations.unique;
         totalGoldSkillChances += learned.gold;
         totalRegularSkillChances += learned.regular;
+        totalUniqueSkillChances += learned.unique;
         if (race.hasBeatTargetTime) beatTargetCount += 1;
         beatTargetTotal += race.beatTargetTimeBonus;
         if (race.hasRushed) {
@@ -264,6 +281,10 @@ export function aggregateScoreBreakdown(entries: UmaEntry[]): ScoreBreakdownSumm
         avgGoodLatePositionBonus: goodLateTotal / raceCount,
         strongStartRate: strongStartCount / raceCount,
         avgStrongStartBonus: strongStartTotal / raceCount,
+        avgUniqueSkillActivations: totalUniqueSkillActivations / raceCount,
+        uniqueSkillActivationRate: totalUniqueSkillChances > 0
+            ? totalUniqueSkillActivations / totalUniqueSkillChances
+            : 0,
         avgRegularSkillActivations: totalRegularSkillActivations / raceCount,
         regularSkillActivationRate: totalRegularSkillChances > 0
             ? totalRegularSkillActivations / totalRegularSkillChances
@@ -274,6 +295,7 @@ export function aggregateScoreBreakdown(entries: UmaEntry[]): ScoreBreakdownSumm
             ? totalGoldSkillActivations / totalGoldSkillChances
             : 0,
         avgGoldSkillPoints: goldSkillTotal / raceCount,
+        avgUniqueSkillPoints: uniqueSkillTotal / raceCount,
         beatTargetTimeRate: beatTargetCount / raceCount,
         avgBeatTargetTimeBonus: beatTargetTotal / raceCount,
         rushedOccurrenceRate: rushedCount / raceCount,

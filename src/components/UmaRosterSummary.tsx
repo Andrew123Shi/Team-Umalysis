@@ -87,6 +87,10 @@ function UmaRosterMetrics({ uma }: { uma: RosterUmaSlot }) {
                     <span className="uma-roster-metric-label">Avg Score</span>
                     <span className="uma-roster-metric-value">{formatScore(score.avg)}</span>
                 </div>
+                <div className="uma-roster-metric uma-roster-metric--primary">
+                    <span className="uma-roster-metric-label">Races Run</span>
+                    <span className="uma-roster-metric-value">{placement.count}</span>
+                </div>
             </div>
             <div className="uma-roster-metrics-grid">
                 <div className="uma-roster-metric">

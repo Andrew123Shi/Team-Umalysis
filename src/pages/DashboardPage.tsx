@@ -27,6 +27,12 @@ const SUMMARY_VALUE = '__summary__';
 const HISTORICAL_PLACEHOLDER = '';
 const HISTORICAL_PLACEHOLDER_LABEL = 'Choose historical uma...';
 
+function scrollToDashboardTop() {
+    requestAnimationFrame(() => {
+        window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    });
+}
+
 export default function DashboardPage() {
     const [tabsEl, setTabsEl] = useState<HTMLDivElement | null>(null);
     const { sessions, loading, progress, error, hasTriedSavedFolder, loadFromFolder } = useRaceStore();
@@ -71,11 +77,13 @@ export default function DashboardPage() {
     const selectRosterUma = (buildKey: string) => {
         setSelectedBuildKey(buildKey);
         setHistoricalSelection(HISTORICAL_PLACEHOLDER);
+        scrollToDashboardTop();
     };
 
     const selectHistoricalUma = (buildKey: string) => {
         setHistoricalSelection(buildKey);
         setSelectedBuildKey(SUMMARY_VALUE);
+        scrollToDashboardTop();
     };
 
     const selectUmaFromLeaderboard = (buildKey: string) => {
@@ -96,6 +104,9 @@ export default function DashboardPage() {
             <Tab.Container
                 defaultActiveKey="overall"
                 onSelect={(key) => {
+                    if (key) {
+                        scrollToDashboardTop();
+                    }
                     if (key === 'uma' && !isSummaryView) {
                         returnToSummary();
                     }

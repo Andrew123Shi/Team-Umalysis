@@ -40,6 +40,9 @@ function emptyBreakdown(): ScoreBreakdownSummary {
         avgGoldSkillActivations: 0,
         goldSkillActivationRate: 0,
         avgGoldSkillPoints: 0,
+        avgUniqueSkillActivations: 0,
+        uniqueSkillActivationRate: 0,
+        avgUniqueSkillPoints: 0,
         beatTargetTimeRate: 0,
         avgBeatTargetTimeBonus: 0,
         rushedOccurrenceRate: 0,
@@ -146,15 +149,19 @@ export function buildUmaComparisonEntries(
         const normalizedTotal = acc.normalizedScores.reduce((sum, value) => sum + value, 0);
         let totalGoldSkillActivations = 0;
         let totalRegularSkillActivations = 0;
+        let totalUniqueSkillActivations = 0;
         let totalGoldSkillChances = 0;
         let totalRegularSkillChances = 0;
+        let totalUniqueSkillChances = 0;
         acc.entries.forEach((entry) => {
             const activations = countSkillActivations(entry);
             const learned = countLearnedSkills(entry);
             totalGoldSkillActivations += activations.gold;
             totalRegularSkillActivations += activations.regular;
+            totalUniqueSkillActivations += activations.unique;
             totalGoldSkillChances += learned.gold;
             totalRegularSkillChances += learned.regular;
+            totalUniqueSkillChances += learned.unique;
         });
         return {
             buildKey: acc.buildKey,
@@ -172,10 +179,13 @@ export function buildUmaComparisonEntries(
             scoreBreakdown: breakdown,
             avgGoldSkillActivations: raceCount > 0 ? totalGoldSkillActivations / raceCount : 0,
             avgRegularSkillActivations: raceCount > 0 ? totalRegularSkillActivations / raceCount : 0,
+            avgUniqueSkillActivations: raceCount > 0 ? totalUniqueSkillActivations / raceCount : 0,
             totalGoldSkillActivations,
             totalRegularSkillActivations,
+            totalUniqueSkillActivations,
             totalGoldSkillChances,
             totalRegularSkillChances,
+            totalUniqueSkillChances,
         };
     });
 

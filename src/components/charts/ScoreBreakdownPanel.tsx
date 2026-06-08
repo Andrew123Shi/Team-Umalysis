@@ -84,13 +84,10 @@ export default function ScoreBreakdownPanel({ breakdown }: { breakdown: ScoreBre
             detail: 'Share of races with the good late-race positioning bonus',
         },
         {
-            label: 'Regular Skill Activations, per Race',
-            value: fmtActivationsWithRate(
-                breakdown.avgRegularSkillActivations,
-                breakdown.regularSkillActivationRate,
-            ),
-            score: formatScore(breakdown.avgRegularSkillPoints),
-            detail: 'Average number of activations and percent of total learned regular skills actually activated',
+            label: 'Unique Skill Activation Rate',
+            value: fmtPct(breakdown.uniqueSkillActivationRate),
+            score: formatScore(breakdown.avgUniqueSkillPoints),
+            detail: 'Percent of learned unique skills that activated',
         },
         {
             label: 'Gold Skill Activations, per Race',
@@ -99,7 +96,16 @@ export default function ScoreBreakdownPanel({ breakdown }: { breakdown: ScoreBre
                 breakdown.goldSkillActivationRate,
             ),
             score: formatScore(breakdown.avgGoldSkillPoints),
-            detail: 'Average number of activations and percent of total learned gold (rare) skills actually activated',
+            detail: 'Average number of activations and percent of total learned gold skills actually activated',
+        },
+        {
+            label: 'Regular Skill Activations, per Race',
+            value: fmtActivationsWithRate(
+                breakdown.avgRegularSkillActivations,
+                breakdown.regularSkillActivationRate,
+            ),
+            score: formatScore(breakdown.avgRegularSkillPoints),
+            detail: 'Average number of activations and percent of total learned regular skills actually activated',
         },
         {
             label: 'Target Time Beat Rate',

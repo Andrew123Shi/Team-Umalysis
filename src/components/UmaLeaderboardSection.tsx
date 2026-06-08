@@ -66,15 +66,17 @@ export default function UmaLeaderboardSection({ sessions, onSelectUma }: UmaLead
             'desc',
             (e) => fmtRateRow(e, e.scoreBreakdown.goodLatePositionRate),
         ),
-        regSkills: buildRows(
+        uniqueSkills: buildRows(
             entries,
-            (e) => e.avgRegularSkillActivations,
+            (e) => e.totalUniqueSkillChances > 0
+                ? e.totalUniqueSkillActivations / e.totalUniqueSkillChances
+                : 0,
             'desc',
-            (e) => fmtAvgActivationRow(
+            (e) => fmtRateRow(
                 e,
-                e.totalRegularSkillActivations,
-                e.totalRegularSkillChances,
-                e.avgRegularSkillActivations,
+                e.totalUniqueSkillChances > 0
+                    ? e.totalUniqueSkillActivations / e.totalUniqueSkillChances
+                    : 0,
             ),
         ),
         goldSkills: buildRows(
@@ -86,6 +88,17 @@ export default function UmaLeaderboardSection({ sessions, onSelectUma }: UmaLead
                 e.totalGoldSkillActivations,
                 e.totalGoldSkillChances,
                 e.avgGoldSkillActivations,
+            ),
+        ),
+        regSkills: buildRows(
+            entries,
+            (e) => e.avgRegularSkillActivations,
+            'desc',
+            (e) => fmtAvgActivationRow(
+                e,
+                e.totalRegularSkillActivations,
+                e.totalRegularSkillChances,
+                e.avgRegularSkillActivations,
             ),
         ),
         beatTarget: buildRows(
@@ -193,7 +206,7 @@ export default function UmaLeaderboardSection({ sessions, onSelectUma }: UmaLead
                     </Col>
                     <Col lg={3} md={6}>
                         <UmaRankTable
-                            title="Top % of Good Mid-Race Positioning"
+                            title="Top Good Mid-Race Positioning"
                             rows={metricTables.goodMid}
                             valueColumnLabel="Rate"
                             defaultSortKey="value"
@@ -204,7 +217,7 @@ export default function UmaLeaderboardSection({ sessions, onSelectUma }: UmaLead
                     </Col>
                     <Col lg={3} md={6}>
                         <UmaRankTable
-                            title="Top % of Good Late-Race Positioning"
+                            title="Top Good Late-Race Positioning"
                             rows={metricTables.goodLate}
                             valueColumnLabel="Rate"
                             defaultSortKey="value"
@@ -218,9 +231,9 @@ export default function UmaLeaderboardSection({ sessions, onSelectUma }: UmaLead
                 <Row className="g-3">
                     <Col lg={3} md={6}>
                         <UmaRankTable
-                            title="Top Regular Skill Activations"
-                            rows={metricTables.regSkills}
-                            valueColumnLabel="Average"
+                            title="Top Unique Skill Activations"
+                            rows={metricTables.uniqueSkills}
+                            valueColumnLabel="Rate"
                             defaultSortKey="value"
                             defaultSortDir="desc"
                             collapsible={!rosterOnly}
@@ -240,7 +253,18 @@ export default function UmaLeaderboardSection({ sessions, onSelectUma }: UmaLead
                     </Col>
                     <Col lg={3} md={6}>
                         <UmaRankTable
-                            title="Top % Beat Target Time"
+                            title="Top Regular Skill Activations"
+                            rows={metricTables.regSkills}
+                            valueColumnLabel="Average"
+                            defaultSortKey="value"
+                            defaultSortDir="desc"
+                            collapsible={!rosterOnly}
+                            onSelectUma={onSelectUma}
+                        />
+                    </Col>
+                    <Col lg={3} md={6}>
+                        <UmaRankTable
+                            title="Top Target Time Beaters"
                             rows={metricTables.beatTarget}
                             valueColumnLabel="Rate"
                             defaultSortKey="value"
@@ -251,7 +275,7 @@ export default function UmaLeaderboardSection({ sessions, onSelectUma }: UmaLead
                     </Col>
                     <Col lg={3} md={6}>
                         <UmaRankTable
-                            title="Least % Rushed Occurrence"
+                            title="Least Rushed Occurrence"
                             rows={metricTables.leastRushed}
                             valueColumnLabel="Rate"
                             defaultSortKey="value"

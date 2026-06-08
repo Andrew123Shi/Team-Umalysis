@@ -17,7 +17,7 @@ import type {
     TTRound,
     UmaEntry,
 } from './types';
-import { computeTotalSkillPoints } from './skillUtils';
+import { computeTotalSkillPoints, isGoldSkill } from './skillUtils';
 import { buildUmaFingerprint } from './umaIdentity';
 import { aggregateScoreBreakdown } from './scoreBreakdown';
 import { buildStyleSaturation } from './styleSaturation';
@@ -156,12 +156,6 @@ function aptitudeSummary(umas: UmaEntry[]): Record<string, NumericSummary> {
         out[field] = summarize(umas.map((u) => u.aptitudes[field]));
     });
     return out;
-}
-
-function isGoldSkill(skillId: number): boolean {
-    const skill = UMDatabaseWrapper.skills[skillId];
-    if (!skill) return skillId % 10 === 1 || skillId >= 100000;
-    return (skill.rarity ?? 0) >= 2 || skillId % 10 === 1;
 }
 
 function collectSkillStats(umas: UmaEntry[]): SkillFrequencyEntry[] {

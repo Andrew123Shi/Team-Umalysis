@@ -1,10 +1,21 @@
 import type { SkillRef } from './types';
 import UMDatabaseWrapper from '../data/UMDatabaseWrapper';
 
+export type SkillRarityCategory = 'regular' | 'gold' | 'unique';
+
+export function getSkillRarityCategory(skillId: number): SkillRarityCategory {
+    const rarity = UMDatabaseWrapper.skills[skillId]?.rarity;
+    if (rarity === 2) return 'gold';
+    if (rarity === 4 || rarity === 5) return 'unique';
+    return 'regular';
+}
+
 export function isGoldSkill(skillId: number): boolean {
-    const skill = UMDatabaseWrapper.skills[skillId];
-    if (!skill) return skillId % 10 === 1 || skillId >= 100000;
-    return (skill.rarity ?? 0) >= 2 || skillId % 10 === 1;
+    return getSkillRarityCategory(skillId) === 'gold';
+}
+
+export function isUniqueSkill(skillId: number): boolean {
+    return getSkillRarityCategory(skillId) === 'unique';
 }
 
 function skillPointCost(skillId: number): number {
