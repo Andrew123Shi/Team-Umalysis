@@ -132,8 +132,8 @@ export default function ScoreBreakdownPanel({ breakdown }: { breakdown: ScoreBre
     ];
 
     return (
-        <Card className="app-card mb-3 h-100">
-            <Card.Body>
+        <Card className="app-card h-100 score-breakdown-panel">
+            <Card.Body className="d-flex flex-column">
                 <SectionHeading
                     title="General Performance"
                     compact

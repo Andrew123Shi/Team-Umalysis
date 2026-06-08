@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import ReactECharts from 'echarts-for-react';
 import { Button, ButtonGroup, Card, Form } from 'react-bootstrap';
 
@@ -23,6 +23,23 @@ export default function StyleSaturationChart({
         DEFAULT_STYLE_SATURATION_OPTIONS.roomScope,
     );
     const [includeTeam, setIncludeTeam] = useState(DEFAULT_STYLE_SATURATION_OPTIONS.includeTeam);
+    const savedIncludeTeamRef = useRef(DEFAULT_STYLE_SATURATION_OPTIONS.includeTeam);
+
+    const handleRoomScopeChange = (scope: StyleSaturationOptions['roomScope']) => {
+        if (scope === roomScope) return;
+        if (scope === 'opponent') {
+            savedIncludeTeamRef.current = includeTeam;
+            setIncludeTeam(false);
+        } else {
+            setIncludeTeam(savedIncludeTeamRef.current);
+        }
+        setRoomScope(scope);
+    };
+
+    const handleIncludeTeamChange = (checked: boolean) => {
+        setIncludeTeam(checked);
+        savedIncludeTeamRef.current = checked;
+    };
 
     const data = useMemo(
         () => buildStyleSaturation(rounds, buildKey, { roomScope, includeTeam }),
@@ -123,7 +140,7 @@ export default function StyleSaturationChart({
     const hasData = data.some((series) => series.points.some((point) => point.races > 0));
 
     return (
-        <Card className="app-card mb-3 h-100">
+        <Card className="app-card h-100">
             <Card.Body>
                 <div className="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-1">
                     <SectionHeading title="Style Sensitivity" compact className="mt-0" />
@@ -131,13 +148,13 @@ export default function StyleSaturationChart({
                         <ButtonGroup size="sm">
                             <Button
                                 variant={roomScope === 'total' ? 'secondary' : 'outline-secondary'}
-                                onClick={() => setRoomScope('total')}
+                                onClick={() => handleRoomScopeChange('total')}
                             >
                                 Total Room
                             </Button>
                             <Button
                                 variant={roomScope === 'opponent' ? 'secondary' : 'outline-secondary'}
-                                onClick={() => setRoomScope('opponent')}
+                                onClick={() => handleRoomScopeChange('opponent')}
                             >
                                 Opponent Only
                             </Button>
@@ -147,7 +164,7 @@ export default function StyleSaturationChart({
                             id="style-saturation-include-team"
                             label="Include Own Team"
                             checked={includeTeam}
-                            onChange={(event) => setIncludeTeam(event.target.checked)}
+                            onChange={(event) => handleIncludeTeamChange(event.target.checked)}
                             className="mb-0 small text-secondary"
                         />
                     </div>

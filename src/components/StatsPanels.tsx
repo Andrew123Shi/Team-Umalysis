@@ -16,6 +16,7 @@ import SkillTable from './charts/SkillTable';
 import StatCards, { type StatCardViewMode } from './charts/StatCards';
 
 import ScoreBreakdownPanel from './charts/ScoreBreakdownPanel';
+import MoodWinRateChart from './charts/MoodWinRateChart';
 import StyleSaturationChart from './charts/StyleSaturationChart';
 import AverageStatsComparisonChart from './charts/AverageStatsComparisonChart';
 import { WinRatePieCard } from './charts/WinRatePies';
@@ -158,7 +159,7 @@ export default function StatsPanels({
 
                 {isUmaView && profileUma ? (
                     <div className="row g-3 align-items-stretch">
-                        <div className="col-lg-5 d-flex flex-column gap-3">
+                        <div className="col-lg-5 d-flex flex-column gap-3 uma-profile-column">
                             <UmaProfilePanel
                                 charaName={profileUma.charaName}
                                 cardId={profileUma.cardId}
@@ -168,13 +169,19 @@ export default function StatsPanels({
                                 entry={latestUmaEntry ?? null}
                             />
                             {styleSaturationRounds && styleSaturationBuildKey && (
-                                <StyleSaturationChart
-                                    rounds={styleSaturationRounds}
-                                    buildKey={styleSaturationBuildKey}
-                                />
+                                <>
+                                    <StyleSaturationChart
+                                        rounds={styleSaturationRounds}
+                                        buildKey={styleSaturationBuildKey}
+                                    />
+                                    <MoodWinRateChart
+                                        rounds={styleSaturationRounds}
+                                        buildKey={styleSaturationBuildKey}
+                                    />
+                                </>
                             )}
                         </div>
-                        <div className="col-lg-7 d-flex flex-column gap-3">
+                        <div className="col-lg-7 d-flex flex-column gap-3 uma-profile-stats-column">
                             <StatCards
                                 stats={stats}
                                 viewMode="uma"

@@ -1338,10 +1338,7 @@ body {
   flex-wrap: wrap;
   gap: 0.4rem;
   padding-top: 0.45rem;
-  padding-bottom: 3rem;
   border-top: 1px solid rgba(255, 255, 255, 0.04);
-  max-height: 16rem;
-  overflow-y: auto;
 }
 
 .skill-chip {
@@ -2235,9 +2232,30 @@ body {
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.24);
 }
 
+.uma-profile-column,
+.uma-profile-stats-column {
+  min-height: 0;
+}
+
+.uma-profile-stats-column > .score-breakdown-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.uma-profile-column > .uma-profile-panel {
+  flex-shrink: 0;
+}
+
+/* Let charts size to their content; h-100 would fight the profile panel for height. */
+.uma-profile-column > .app-card.h-100 {
+  flex-shrink: 0;
+  height: auto !important;
+}
+
 .uma-profile-panel {
   position: relative;
   font-size: 1.05rem;
+  flex-shrink: 0;
 }
 
 .uma-profile-panel::before {

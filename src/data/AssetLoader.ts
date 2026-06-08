@@ -23,6 +23,10 @@ class AssetLoaderClass {
         return this.getAssetUrl(`textures/${name}.webp`);
     }
 
+    getMotivationIcon(name: string): string {
+        return this.getAssetUrl(`textures/${name}.png`);
+    }
+
     getRankIcon(filename: string): string {
         return this.getAssetUrl(`textures/uma_ranks/${filename}.webp`);
     }

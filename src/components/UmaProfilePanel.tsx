@@ -234,7 +234,7 @@ export default function UmaProfilePanel({
     const totalSkillPoints = entry ? computeTotalSkillPoints(entry.skills) : 0;
 
     return (
-        <Card className="app-card h-100 uma-profile-panel uma-roster-member">
+        <Card className="app-card uma-profile-panel uma-roster-member">
             <Card.Body className="uma-roster-member-body uma-profile-member-body">
                 <div className="uma-roster-sm-header uma-profile-sm-header">
                     <img
