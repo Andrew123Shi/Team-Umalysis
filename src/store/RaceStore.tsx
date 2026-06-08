@@ -120,11 +120,10 @@ export function RaceStoreProvider({ children }: { children: React.ReactNode }) {
     }, [onProgress, finalizeSessions, trainerNameOverride]);
 
     const loadFromFolder = useCallback(async () => {
-        setLoading(true);
         setError('');
         setProgress({ loaded: 0, total: 0 });
         try {
-            const result = await pickFolderAndLoadSessions(onProgress);
+            const result = await pickFolderAndLoadSessions(onProgress, () => setLoading(true));
             finalizeSessions(result.sessions, trainerNameOverride);
             setFolderName(result.folderName);
             setLastLoadedAt(new Date());

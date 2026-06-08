@@ -60,11 +60,13 @@ async function loadDirectoryHandle(): Promise<FileSystemDirectoryHandle | null> 
 
 export async function pickFolderAndLoadSessions(
     onProgress?: (loaded: number, total: number) => void,
+    onFolderSelected?: () => void,
 ): Promise<FolderLoadResult> {
     if (!('showDirectoryPicker' in window)) {
         throw new Error('Folder picker is not supported in this browser. Use Chrome or Edge to load Team Trials files directly.');
     }
     const handle = await window.showDirectoryPicker({ mode: 'read' });
+    onFolderSelected?.();
     await saveDirectoryHandle(handle);
     const loaded = await loadSessionsFromHandle(handle, onProgress);
     return {

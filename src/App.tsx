@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, Container, Nav, Navbar, Spinner } from 'react-bootstrap';
+import { Alert, Container, Nav, Navbar } from 'react-bootstrap';
 import { BrowserRouter, Link, NavLink, Route, Routes } from 'react-router-dom';
 import './App.css';
 import './dark-mode.css';
@@ -52,7 +52,7 @@ function AppHeader() {
                                         {` Team Trials file${displayedFileCount === 1 ? '' : 's'} loaded`}
                                     </>
                                 ) : (
-                                    loading ? 'Loading Team Trials files...' : 'No Team Trials folder loaded'
+                                    loading ? 'Loading Team Trials files...' : 'No Team Trials files loaded'
                                 )}
                             </span>
                             <Nav.Link onClick={() => reload()} className={loading ? 'disabled' : ''}>Reload Folder</Nav.Link>
@@ -98,20 +98,7 @@ function BootstrapGate({ children }: { children: React.ReactNode }) {
         );
     }
     if (!ready) {
-        return (
-            <Container className="py-5">
-                <div className="page-hero text-center">
-                    <div className="page-hero-content">
-                        <div className="page-eyebrow justify-content-center">Loading Assets</div>
-                        <h1>Team Umalysis</h1>
-                        <div className="mt-3 text-secondary">
-                            <Spinner animation="border" size="sm" className="me-2" />
-                            Loading game database...
-                        </div>
-                    </div>
-                </div>
-            </Container>
-        );
+        return null;
     }
     return <>{children}</>;
 }
