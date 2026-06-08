@@ -6,9 +6,7 @@
 
 horseACT is a game plugin that automatically saves race JSONs in real-time while you play Uma Musume. If you do not already have horseACT installed, see [horseACT installation](https://github.com/ayaliz/horseACT#installation). Do note that Team Trials saving is set to `false` by default. 
 
-Once files appear in your Team Trials folder, it is easy for Team Umalysis to read from it!
-
-## TBA: Instructions
+Once files appear in your Team Trials folder, just direct Team Umalysis to that folder and it will parse it automatically! In addition, it will try to remember the folder location across sessions, so you do not have to reselect the folder every time (though, occasionally your browser may ask you to grant folder access again, especially if site permissions are cleared or browser data is reset). 
 
 ## Acknowledgements
 
