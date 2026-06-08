@@ -133,8 +133,8 @@ export default function DashboardPage() {
                             <h2 className="h4">Choose Your Team Trials Folder</h2>
                             <p className="text-muted mb-3">
                                 {hasTriedSavedFolder
-                                    ? 'No Team Trials sessions are loaded yet. Select the folder where horseACT saves your TT-*.json files.'
-                                    : 'Checking for a remembered Team Trials folder...'}
+                                    ? 'No Team Trials files are loaded. Select the folder where your Team Trials .json files are stored.'
+                                    : 'Checking for a saved Team Trials folder...'}
                             </p>
                             <Button variant="primary" onClick={loadFromFolder}>
                                 Choose Team Trials Folder

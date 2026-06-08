@@ -4,6 +4,7 @@ import { CharaTableData } from './types';
 import AssetLoader from "../../../../data/AssetLoader";
 import GameDataLoader from "../../../../data/GameDataLoader";
 import { getSkillDef } from "../../../RaceReplay/utils/SkillDataUtils";
+import { getSkillIconFolderByIconId } from "../../../../utils/profileSkillUtils";
 import './SkillBreakdownModal.css';
 
 interface SkillBreakdownModalProps {
@@ -288,7 +289,9 @@ const SkillBreakdownModal: React.FC<SkillBreakdownModalProps> = ({ show, onHide,
                                         <div className="sbm-skill-icons">
                                             {evt.events.map((e: any, i: number) => {
                                                 const skillDef = getSkillDef(e.skillId);
-                                                const iconUrl = e.iconId ? AssetLoader.getSkillIcon(e.iconId) : (skillDef?.iconId ? AssetLoader.getSkillIcon(skillDef.iconId) : null);
+                                                const iconId = e.iconId ?? skillDef?.iconId;
+                                                const iconFolder = iconId ? getSkillIconFolderByIconId(iconId) : undefined;
+                                                const iconUrl = iconId ? AssetLoader.getSkillIcon(iconId, iconFolder) : null;
                                                 return iconUrl ? (
                                                     <OverlayTrigger key={i} placement="top" overlay={<Tooltip id={`tt-${idx}-${i}`}>{e.name}</Tooltip>}>
                                                         <img src={iconUrl} alt="skill" className="sbm-item-icon sbm-item-icon--sm" />
@@ -337,7 +340,9 @@ const SkillBreakdownModal: React.FC<SkillBreakdownModalProps> = ({ show, onHide,
 
                         const skillDef = getSkillDef(evt.skillId);
                         const isGold = skillDef?.rarity === 2 || skillDef?.rarity === 3;
-                        const iconUrl = evt.iconId ? AssetLoader.getSkillIcon(evt.iconId) : (skillDef?.iconId ? AssetLoader.getSkillIcon(skillDef.iconId) : null);
+                        const iconId = evt.iconId ?? skillDef?.iconId;
+                        const iconFolder = iconId ? getSkillIconFolderByIconId(iconId) : undefined;
+                        const iconUrl = iconId ? AssetLoader.getSkillIcon(iconId, iconFolder) : null;
 
                         const startPct = Math.min(100, Math.max(0, (evt.startDistance / totalDistance) * 100));
                         const endPct = Math.min(100, Math.max(0, (evt.endDistance / totalDistance) * 100));

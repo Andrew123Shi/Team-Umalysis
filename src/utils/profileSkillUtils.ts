@@ -94,7 +94,11 @@ export function getProfileSkillRarityClass(skillId: number): string {
     return '';
 }
 
+export function getSkillIconFolderByIconId(iconId: number): SkillIconFolder | undefined {
+    return SKILL_ICON_FOLDER_BY_ID[iconId];
+}
+
 export function getProfileSkillIconFolder(skillId: number): SkillIconFolder | undefined {
     const iconId = getSkillDef(skillId)?.iconId ?? 0;
-    return iconId > 0 ? SKILL_ICON_FOLDER_BY_ID[iconId] : undefined;
+    return iconId > 0 ? getSkillIconFolderByIconId(iconId) : undefined;
 }

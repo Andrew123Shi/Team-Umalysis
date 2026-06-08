@@ -7,6 +7,7 @@ import CharaProperLabels from "../../../CharaProperLabels";
 import { getCharaTableColumns } from "./columns";
 import { getSkillDef } from "../../../RaceReplay/utils/SkillDataUtils";
 import { getCourseAptitudeFilters } from "../../../../utils/course";
+import { getSkillIconFolderByIconId } from "../../../../utils/profileSkillUtils";
 import AssetLoader from "../../../../data/AssetLoader";
 import SkillBreakdownModal from "./SkillBreakdownModal";
 
@@ -180,12 +181,13 @@ const CharaTable: React.FC<CharaTableProps> = ({ data, courseId, showPredictionC
                                                     return sortedSkills.map((cs, idx) => {
                                                         const count = row.activatedSkillCounts.get(cs.skillId);
                                                         const skillDef = getSkillDef(cs.skillId);
+                                                        const iconFolder = skillDef?.iconId ? getSkillIconFolderByIconId(skillDef.iconId) : undefined;
                                                         return (
                                                             <div key={idx} className="skill-item">
                                                                 <div className="skill-info">
                                                                     {skillDef?.iconId ? (
                                                                         <img
-                                                                            src={AssetLoader.getSkillIcon(skillDef.iconId)}
+                                                                            src={AssetLoader.getSkillIcon(skillDef.iconId, iconFolder)}
                                                                             alt=""
                                                                             className="skill-icon"
                                                                         />
