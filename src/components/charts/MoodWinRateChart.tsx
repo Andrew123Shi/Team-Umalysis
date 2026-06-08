@@ -10,6 +10,7 @@ import { chartTooltipStyle } from './chartTooltip';
 
 const MOOD_ICON_HEIGHT = 22;
 const MOOD_ICON_WIDTH = Math.round(MOOD_ICON_HEIGHT * (184 / 68));
+const X_AXIS_ICON_GAP = 6;
 
 const MOOD_GRADIENT_STOPS = [1, 2, 3, 4, 5].map((mood, index) => ({
     offset: index / 4,
@@ -63,10 +64,10 @@ export default function MoodWinRateChart({
             },
         },
         grid: {
-            left: 32,
+            left: 38,
             right: 16,
             top: 24,
-            bottom: 56,
+            bottom: MOOD_ICON_HEIGHT - 10,
             containLabel: true,
         },
         xAxis: {
@@ -76,6 +77,7 @@ export default function MoodWinRateChart({
             axisTick: { show: false },
             axisLabel: {
                 interval: 0,
+                margin: X_AXIS_ICON_GAP,
                 formatter: (value: string) => `{${value}|}`,
                 rich: Object.fromEntries(data.map((point) => [
                     moodAxisKey(point.mood),
@@ -148,14 +150,13 @@ export default function MoodWinRateChart({
     const hasData = data.some((point) => point.races > 0);
 
     return (
-        <Card className="app-card h-100">
-            <Card.Body>
+        <Card className="app-card h-100 mood-win-rate-chart-card">
+            <Card.Body className="d-flex flex-column">
                 <SectionHeading title="Mood Sensitivity" compact className="mt-0 mb-1" />
-                <div className="small text-muted mb-2">
-                    Win rate at each mood level
-                </div>
                 {hasData ? (
-                    <ReactECharts option={option} style={{ height: 320 }} />
+                    <div className="mood-win-rate-chart-canvas">
+                        <ReactECharts option={option} style={{ height: '100%', width: '100%' }} />
+                    </div>
                 ) : (
                     <div className="text-muted small py-4 text-center">Not enough data</div>
                 )}
