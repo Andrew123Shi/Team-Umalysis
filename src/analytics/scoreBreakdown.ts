@@ -2,30 +2,44 @@ import type { ScoreBreakdownSummary, ScoreEvent, UmaEntry } from './types';
 import { getSkillRarityCategory } from './skillUtils';
 
 /** Finish position base scores (1st–12th). */
-const FINISH_POSITION_IDS = new Set([
-    60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71,
-]);
+const FINISH_POSITION_MIN = 60;
+const FINISH_POSITION_MAX = 71;
 
 /** Win margin bonus for the race winner (1st–2nd gap). */
-const WIN_MARGIN_IDS = new Set([
-    5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 21, 41, 51, 74, 75, 76, 77, 78, 80,
-]);
+const WIN_MARGIN_MIN = 1;
+const WIN_MARGIN_MAX = 21;
 
-const GOOD_MID_POSITION_IDS = new Set([58]);
-const GOOD_LATE_POSITION_IDS = new Set([59]);
-const STRONG_START_IDS = new Set([25]);
+const GOOD_MID_POSITION_ID = 58;
+const GOOD_LATE_POSITION_ID = 59;
+const STRONG_START_ID = 25;
 
-const UNIQUE_SKILL_ID = 55;
+/** Unique skill activation by level: 40–45 and 50–55 (lv6 down to lv1 in each range). */
+const UNIQUE_SKILL_RANGES: ReadonlyArray<[number, number]> = [[40, 45], [50, 55]];
+
 const GOLD_SKILL_ID = 56;
 const REGULAR_SKILL_ID = 57;
 
-/** Beat standard course time (100 pt per 0.1 s, up to 2,000). */
-const BEAT_TARGET_TIME_IDS = new Set([
-    42, 52, 79, 81, 83, 84, 85, 86, 87, 88, 89, 90, 91,
-]);
+/** Beat standard course time; IDs 72+ encode various time margins. */
+const BEAT_TARGET_TIME_MIN = 72;
 
 const RUSHED_FLAT_ID = 23;
 const RUSHED_PER_SECOND_ID = 24;
+
+function isFinishPositionId(id: number): boolean {
+    return id >= FINISH_POSITION_MIN && id <= FINISH_POSITION_MAX;
+}
+
+function isWinMarginId(id: number): boolean {
+    return id >= WIN_MARGIN_MIN && id <= WIN_MARGIN_MAX;
+}
+
+function isUniqueSkillId(id: number): boolean {
+    return UNIQUE_SKILL_RANGES.some(([min, max]) => id >= min && id <= max);
+}
+
+function isBeatTargetTimeId(id: number): boolean {
+    return id >= BEAT_TARGET_TIME_MIN;
+}
 
 export function countLearnedSkills(entry: UmaEntry): { gold: number; regular: number; unique: number } {
     let gold = 0;
@@ -134,30 +148,30 @@ export function breakdownRaceScoreEvents(events: ScoreEvent[]): RaceScoreBreakdo
         const base = scoreEventBaseScore(event);
         const id = event.rawScoreId;
 
-        if (FINISH_POSITION_IDS.has(id)) {
+        if (isFinishPositionId(id)) {
             result.finishPositionScore += base;
             return;
         }
-        if (WIN_MARGIN_IDS.has(id)) {
+        if (isWinMarginId(id)) {
             result.winMarginBonus += base;
             return;
         }
-        if (GOOD_MID_POSITION_IDS.has(id)) {
+        if (id === GOOD_MID_POSITION_ID) {
             result.hasGoodMidPosition = true;
             result.goodMidPositionScore += base;
             return;
         }
-        if (GOOD_LATE_POSITION_IDS.has(id)) {
+        if (id === GOOD_LATE_POSITION_ID) {
             result.hasGoodLatePosition = true;
             result.goodLatePositionScore += base;
             return;
         }
-        if (STRONG_START_IDS.has(id)) {
+        if (id === STRONG_START_ID) {
             result.hasStrongStart = true;
             result.strongStartScore += base;
             return;
         }
-        if (id === UNIQUE_SKILL_ID) {
+        if (isUniqueSkillId(id)) {
             result.uniqueSkillPoints += base;
             return;
         }
@@ -169,7 +183,7 @@ export function breakdownRaceScoreEvents(events: ScoreEvent[]): RaceScoreBreakdo
             result.regularSkillPoints += base;
             return;
         }
-        if (BEAT_TARGET_TIME_IDS.has(id)) {
+        if (isBeatTargetTimeId(id)) {
             result.beatTargetTimeBonus += base;
             result.hasBeatTargetTime = true;
             return;
@@ -224,7 +238,7 @@ export function aggregateScoreBreakdown(entries: UmaEntry[]): ScoreBreakdownSumm
         const race = breakdownRaceScoreEvents(entry.scoreEvents);
         finishOrderTotal += entry.finishOrder;
         finishPositionTotal += race.finishPositionScore;
-        if (entry.finishOrder === 1 && race.winMarginBonus > 0) {
+        if (entry.finishOrder === 1) {
             winMarginBonuses.push(race.winMarginBonus);
             if (entry.winMarginLengths !== undefined) {
                 winMarginLengths.push(entry.winMarginLengths);
@@ -263,6 +277,7 @@ export function aggregateScoreBreakdown(entries: UmaEntry[]): ScoreBreakdownSumm
 
     const raceCount = entries.length;
     const winMarginWinCount = winMarginBonuses.length;
+    const winMarginLengthCount = winMarginLengths.length;
     const winMarginTotal = winMarginBonuses.reduce((sum, value) => sum + value, 0);
     const winMarginLengthTotal = winMarginLengths.reduce((sum, value) => sum + value, 0);
     const rushedDurationCount = rushedDurations.length;
@@ -272,9 +287,10 @@ export function aggregateScoreBreakdown(entries: UmaEntry[]): ScoreBreakdownSumm
         raceCount,
         avgFinishOrder: finishOrderTotal / raceCount,
         avgFinishPositionScore: finishPositionTotal / raceCount,
-        avgWinMarginLengths: winMarginLengths.length > 0 ? winMarginLengthTotal / winMarginLengths.length : 0,
+        avgWinMarginLengths: winMarginLengthCount > 0 ? winMarginLengthTotal / winMarginLengthCount : 0,
         avgWinMarginBonus: winMarginWinCount > 0 ? winMarginTotal / winMarginWinCount : 0,
         winMarginWinCount,
+        winMarginLengthCount,
         goodMidPositionRate: goodMidCount / raceCount,
         avgGoodMidPositionBonus: goodMidTotal / raceCount,
         goodLatePositionRate: goodLateCount / raceCount,

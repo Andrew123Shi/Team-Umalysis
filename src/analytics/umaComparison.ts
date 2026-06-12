@@ -28,6 +28,7 @@ function emptyBreakdown(): ScoreBreakdownSummary {
         avgWinMarginLengths: 0,
         avgWinMarginBonus: 0,
         winMarginWinCount: 0,
+        winMarginLengthCount: 0,
         goodMidPositionRate: 0,
         avgGoodMidPositionBonus: 0,
         goodLatePositionRate: 0,

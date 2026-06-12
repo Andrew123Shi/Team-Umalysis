@@ -209,7 +209,7 @@ export function fmtWinMarginRow(entry: UmaComparisonEntry): UmaRankRow {
     return {
         entry,
         countLabel: `${b.winMarginWinCount} / ${b.raceCount}`,
-        valueLabel: b.winMarginWinCount > 0 ? `${b.avgWinMarginLengths.toFixed(2)} L` : '—',
+        valueLabel: b.winMarginLengthCount > 0 ? `${b.avgWinMarginLengths.toFixed(2)} L` : '—',
         countSort: b.winMarginWinCount,
         valueSort: b.avgWinMarginLengths,
     };

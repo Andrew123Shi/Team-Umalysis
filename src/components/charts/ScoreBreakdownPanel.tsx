@@ -57,13 +57,13 @@ export default function ScoreBreakdownPanel({ breakdown }: { breakdown: ScoreBre
         },
         {
             label: 'Win Margin for Wins',
-            value: breakdown.winMarginWinCount > 0
+            value: breakdown.winMarginLengthCount > 0
                 ? fmtInWins(fmtLengths(breakdown.avgWinMarginLengths), breakdown.winMarginWinCount)
                 : '—',
             score: breakdown.winMarginWinCount > 0
                 ? fmtInWins(formatScore(breakdown.avgWinMarginBonus), breakdown.winMarginWinCount)
                 : '—',
-            detail: 'Distance to 2nd place for wins and base points from the winning margin',
+            detail: 'Average gap to 2nd place (from replay) and score bonus from the winning margin',
         },
         {
             label: 'Strong Start Rate',

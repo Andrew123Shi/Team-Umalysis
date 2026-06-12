@@ -34,7 +34,10 @@ export type ScoreBreakdownSummary = {
     avgFinishPositionScore: number;
     avgWinMarginLengths: number;
     avgWinMarginBonus: number;
+    /** 1st-place finishes included in win-margin stats. */
     winMarginWinCount: number;
+    /** Wins with a replay-derived margin in lengths. */
+    winMarginLengthCount: number;
     goodMidPositionRate: number;
     avgGoodMidPositionBonus: number;
     goodLatePositionRate: number;

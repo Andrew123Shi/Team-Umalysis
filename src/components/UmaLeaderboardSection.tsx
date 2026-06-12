@@ -43,7 +43,7 @@ export default function UmaLeaderboardSection({ sessions, onSelectUma }: UmaLead
 
     const metricTables = useMemo(() => ({
         winMargin: buildRows(
-            entries.filter((e) => e.scoreBreakdown.winMarginWinCount > 0),
+            entries.filter((e) => e.scoreBreakdown.winMarginLengthCount > 0),
             (e) => e.scoreBreakdown.avgWinMarginLengths,
             'desc',
             fmtWinMarginRow,
