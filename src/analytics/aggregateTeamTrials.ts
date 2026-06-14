@@ -695,6 +695,7 @@ export function aggregateStats(
                         if (uma && teamRatings) {
                             return [{
                                 date: s.savedAt!.toISOString().slice(0, 10),
+                                fileName: s.fileName,
                                 teamScore: uma.totalScore,
                                 supportCardBonus: s.supportCardBonus,
                                 selfTeamRating: teamRatings.selfTeamRating,
@@ -708,6 +709,7 @@ export function aggregateStats(
                 if (!teamRatings) return [];
                 return [{
                     date: s.savedAt!.toISOString().slice(0, 10),
+                    fileName: s.fileName,
                     teamScore: sessionAggregateScore(s, options),
                     supportCardBonus: s.supportCardBonus,
                     selfTeamRating: teamRatings.selfTeamRating,

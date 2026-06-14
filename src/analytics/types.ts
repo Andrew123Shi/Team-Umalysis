@@ -252,6 +252,7 @@ export type RosterUpdate = {
 
 export type ScoreTrendPoint = {
     date: string;
+    fileName: string;
     teamScore: number;
     supportCardBonus: number;
     selfTeamRating: number;

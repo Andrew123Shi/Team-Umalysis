@@ -24,6 +24,57 @@ import { DISTANCE_LABELS as DISTANCE_MAP } from '../analytics/types';
 const RUNAWAY_TRIGGER_SKILL_ID = 202051;
 const METERS_PER_LENGTH = 2.5;
 
+function charaResultTeamKey(trainedCharaId: number, teamId: number): string {
+    return `${trainedCharaId}:${teamId}`;
+}
+
+function buildCharaResultMaps(charaResults: any[]) {
+    const byTrainedCharaIdAndTeam = new Map<string, any>();
+    const byFrameOrder = new Map<number, any>();
+    charaResults.forEach((charaResult: any) => {
+        const trainedCharaId = Number(charaResult?.trained_chara_id);
+        const teamId = Number(charaResult?.team_id);
+        const frameOrder = Number(charaResult?.frame_order);
+        if (Number.isFinite(trainedCharaId) && Number.isFinite(teamId)) {
+            byTrainedCharaIdAndTeam.set(charaResultTeamKey(trainedCharaId, teamId), charaResult);
+        }
+        if (Number.isFinite(frameOrder)) byFrameOrder.set(frameOrder, charaResult);
+    });
+    return { byTrainedCharaIdAndTeam, byFrameOrder };
+}
+
+/** trained_chara_id is per-trainer, not unique in a race — pair with team_id. */
+function resolveCharaResult(
+    horse: any,
+    maps: ReturnType<typeof buildCharaResultMaps>,
+): any | undefined {
+    const trainedCharaId = Number(horse?.trained_chara_id);
+    const teamId = Number(horse?.team_id);
+    const frameOrder = Number(horse?.frame_order);
+    if (Number.isFinite(trainedCharaId) && Number.isFinite(teamId)) {
+        const byTeam = maps.byTrainedCharaIdAndTeam.get(charaResultTeamKey(trainedCharaId, teamId));
+        if (byTeam) return byTeam;
+    }
+    if (Number.isFinite(frameOrder) && frameOrder > 0) {
+        return maps.byFrameOrder.get(frameOrder);
+    }
+    return undefined;
+}
+
+function isSameRaceHorse(startHorse: any, raceHorse: any): boolean {
+    const trainedCharaId = Number(startHorse?.trained_chara_id);
+    const teamId = Number(startHorse?.team_id);
+    if (Number.isFinite(trainedCharaId) && Number.isFinite(teamId)
+        && trainedCharaId === Number(raceHorse?.trained_chara_id)
+        && teamId === Number(raceHorse?.team_id)) {
+        return true;
+    }
+    const frameOrder = Number(startHorse?.frame_order);
+    return Number.isFinite(frameOrder)
+        && frameOrder > 0
+        && frameOrder === Number(raceHorse?.frame_order);
+}
+
 function bisectFrameIndex(frames: ParsedRaceView['raceData']['frame'], time: number): number {
     if (frames.length === 0) return 0;
     const last = frames.length - 1;
@@ -244,22 +295,13 @@ export function parseTeamTrialRace(json: any, index: number): ParsedRaceView | {
         : undefined;
     const courseAptitudeFilters = getCourseAptitudeFilters(courseId);
     const charaResults = Array.isArray(result.chara_result_array) ? result.chara_result_array : [];
-    const resultByTrainedCharaId = new Map<number, any>();
-    const resultByFrameOrder = new Map<number, any>();
-    charaResults.forEach((charaResult: any) => {
-        const trainedCharaId = Number(charaResult?.trained_chara_id);
-        const frameOrder = Number(charaResult?.frame_order);
-        if (Number.isFinite(trainedCharaId)) resultByTrainedCharaId.set(trainedCharaId, charaResult);
-        if (Number.isFinite(frameOrder)) resultByFrameOrder.set(frameOrder, charaResult);
-    });
+    const charaResultMaps = buildCharaResultMaps(charaResults);
 
     const raceHorseInfo = start.race_horse_data_array
         .filter((horse: any) => horse !== null)
         .map((horse: any, horseIndex: number) => {
             const startFrameOrder = Number(horse?.frame_order);
-            const trainedCharaId = Number(horse?.trained_chara_id);
-            const charaResult = resultByTrainedCharaId.get(trainedCharaId)
-                ?? resultByFrameOrder.get(startFrameOrder);
+            const charaResult = resolveCharaResult(horse, charaResultMaps);
             const resultFrameOrder = Number(charaResult?.frame_order);
             const frameOrder = Number.isFinite(resultFrameOrder) && resultFrameOrder > 0
                 ? resultFrameOrder
@@ -330,8 +372,7 @@ export function parseTeamTrialSession(json: any, fileName: string): TTSession | 
         const result = results[index];
         const horses = start.race_horse_data_array ?? [];
         const charaResults = result.chara_result_array ?? [];
-        const resultById = new Map<number, any>();
-        charaResults.forEach((cr: any) => resultById.set(Number(cr.trained_chara_id), cr));
+        const charaResultMaps = buildCharaResultMaps(charaResults);
         const winMarginsByTrainedCharaId = computeWinnerMarginLengths(parsed.raceData, parsed.raceHorseInfo);
 
         const playerUmas: UmaEntry[] = [];
@@ -339,10 +380,8 @@ export function parseTeamTrialSession(json: any, fileName: string): TTSession | 
         const npcUmas: UmaEntry[] = [];
 
         horses.forEach((horse: any) => {
-            const hydrated = parsed.raceHorseInfo.find(
-                (h: any) => Number(h.trained_chara_id) === Number(horse.trained_chara_id),
-            ) ?? horse;
-            const charaResult = resultById.get(Number(horse.trained_chara_id));
+            const hydrated = parsed.raceHorseInfo.find((h: any) => isSameRaceHorse(horse, h)) ?? horse;
+            const charaResult = resolveCharaResult(horse, charaResultMaps);
             const entry = buildUmaEntry(
                 hydrated,
                 charaResult,

@@ -10,12 +10,14 @@ import {
 } from '../data/raceLoader';
 
 const TRAINER_OVERRIDE_KEY = 'team-umalysis-trainer-name-override';
+const DEBUG_MODE_KEY = 'team-umalysis-debug-mode';
 
 type RaceStoreValue = {
     sessions: TTSession[];
     index: SessionIndexEntry[];
     trainerName: string;
     trainerNameOverride: string;
+    debugMode: boolean;
     dataSource: DataSource | null;
     folderName: string;
     lastLoadedAt: Date | null;
@@ -27,6 +29,7 @@ type RaceStoreValue = {
     loadFromFolder: () => Promise<void>;
     reload: () => Promise<void>;
     saveTrainerNameOverride: (value: string) => void;
+    setDebugMode: (enabled: boolean) => void;
 };
 
 const RaceStoreContext = createContext<RaceStoreValue | null>(null);
@@ -49,6 +52,23 @@ function saveStoredTrainerNameOverride(value: string) {
         else localStorage.removeItem(TRAINER_OVERRIDE_KEY);
     } catch {
         // Ignore storage failures; the override still applies for this session.
+    }
+}
+
+function loadStoredDebugMode(): boolean {
+    try {
+        return localStorage.getItem(DEBUG_MODE_KEY) === '1';
+    } catch {
+        return false;
+    }
+}
+
+function saveStoredDebugMode(enabled: boolean) {
+    try {
+        if (enabled) localStorage.setItem(DEBUG_MODE_KEY, '1');
+        else localStorage.removeItem(DEBUG_MODE_KEY);
+    } catch {
+        // Ignore storage failures; the setting still applies for this session.
     }
 }
 
@@ -76,6 +96,7 @@ export function RaceStoreProvider({ children }: { children: React.ReactNode }) {
     const [index, setIndex] = useState<SessionIndexEntry[]>([]);
     const [trainerName, setTrainerName] = useState('');
     const [trainerNameOverride, setTrainerNameOverride] = useState(loadStoredTrainerNameOverride);
+    const [debugMode, setDebugModeState] = useState(loadStoredDebugMode);
     const [dataSource, setDataSource] = useState<DataSource | null>(null);
     const [folderName, setFolderName] = useState('');
     const [lastLoadedAt, setLastLoadedAt] = useState<Date | null>(null);
@@ -164,6 +185,11 @@ export function RaceStoreProvider({ children }: { children: React.ReactNode }) {
         finalizeSessions(sessions, trimmed);
     }, [finalizeSessions, sessions]);
 
+    const setDebugMode = useCallback((enabled: boolean) => {
+        saveStoredDebugMode(enabled);
+        setDebugModeState(enabled);
+    }, []);
+
     useEffect(() => {
         if (autoLoadStarted) return;
         autoLoadStarted = true;
@@ -177,6 +203,7 @@ export function RaceStoreProvider({ children }: { children: React.ReactNode }) {
         index,
         trainerName,
         trainerNameOverride,
+        debugMode,
         dataSource,
         folderName,
         lastLoadedAt,
@@ -188,11 +215,13 @@ export function RaceStoreProvider({ children }: { children: React.ReactNode }) {
         loadFromFolder,
         reload,
         saveTrainerNameOverride,
+        setDebugMode,
     }), [
         sessions,
         index,
         trainerName,
         trainerNameOverride,
+        debugMode,
         dataSource,
         folderName,
         lastLoadedAt,
@@ -204,6 +233,7 @@ export function RaceStoreProvider({ children }: { children: React.ReactNode }) {
         loadFromFolder,
         reload,
         saveTrainerNameOverride,
+        setDebugMode,
     ]);
 
     return (

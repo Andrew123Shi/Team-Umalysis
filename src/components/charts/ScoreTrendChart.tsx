@@ -9,6 +9,7 @@ import { formatUmaDisplayName } from '../../utils/umaDisplayName';
 import { formatRatingHtml } from '../RatingDisplay';
 import { chartTooltipStyle } from './chartTooltip';
 import SectionHeading from '../SectionHeading';
+import { useRaceStore } from '../../store/RaceStore';
 
 type ScoreMode = 'normalized' | 'raw';
 
@@ -123,6 +124,7 @@ function formatRosterUpdateHtml(update: RosterUpdate): string {
 function buildTooltipFormatter(
     scoreTrend: AggregatedStats['scoreTrend'],
     formatValue: (seriesName: string | undefined, value: number) => string,
+    showFileName = false,
 ) {
     return (params: unknown) => {
         const items = (Array.isArray(params) ? params : [params]) as {
@@ -140,8 +142,13 @@ function buildTooltipFormatter(
             if (val == null || !Number.isFinite(val)) return '';
             return `${item.marker ?? ''}${item.seriesName ?? ''}: ${formatValue(item.seriesName, val)}`;
         }).filter(Boolean);
-        const rosterUpdate = dataIndex != null ? scoreTrend[dataIndex]?.rosterUpdate : undefined;
+        const trendPoint = dataIndex != null ? scoreTrend[dataIndex] : undefined;
+        const rosterUpdate = trendPoint?.rosterUpdate;
         const parts = [`<b>${header}</b>`, ...lines.map((line) => `<b>${line}</b>`)];
+        if (showFileName && trendPoint?.fileName) {
+            parts.push('');
+            parts.push(`<span style="color:#adb5bd;font-size:11px">${trendPoint.fileName}</span>`);
+        }
         if (rosterUpdate) {
             parts.push('');
             parts.push(formatRosterUpdateHtml(rosterUpdate));
@@ -206,6 +213,7 @@ export default function ScoreTrendChart({
     stats: AggregatedStats;
     viewMode?: StatCardViewMode;
 }) {
+    const { debugMode } = useRaceStore();
     const [mode, setMode] = useState<ScoreMode>('raw');
     const [emaPeriod, setEmaPeriod] = useState(50);
     const [legendSelected, setLegendSelected] = useState<ScoreLegendSelection>({});
@@ -364,7 +372,11 @@ export default function ScoreTrendChart({
                         snap: true,
                         lineStyle: { color: '#adb5bd', type: 'dashed' },
                     },
-                    formatter: buildTooltipFormatter(stats.scoreTrend, (_seriesName, value) => formatScore(value)),
+                    formatter: buildTooltipFormatter(
+                        stats.scoreTrend,
+                        (_seriesName, value) => formatScore(value),
+                        debugMode,
+                    ),
                 },
                 legend: {
                     data: legendData,
@@ -439,6 +451,7 @@ export default function ScoreTrendChart({
             formatter: buildTooltipFormatter(
                 stats.scoreTrend,
                 (seriesName, value) => (seriesName === 'Support Bonus' ? `${value}%` : formatScore(value)),
+                debugMode,
             ),
         },
         legend: {
@@ -559,6 +572,7 @@ export default function ScoreTrendChart({
         stats.scoreTrend,
         legendSelected,
         echartsLegendSelected,
+        debugMode,
     ]);
 
     return (

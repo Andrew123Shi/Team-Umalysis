@@ -11,10 +11,12 @@ export default function SettingsPage() {
         latestFileName,
         trainerName: activeTrainer,
         trainerNameOverride,
+        debugMode,
         index,
         loadFromFolder,
         reload,
         saveTrainerNameOverride,
+        setDebugMode,
         loading,
         progress,
     } = useRaceStore();
@@ -43,7 +45,7 @@ export default function SettingsPage() {
     return (
         <Container fluid className="pb-5 pt-3 page-shell">
             <div className="settings-card">
-                <SectionHeading level="section" title="Settings: Data Source" className="mt-0" />
+                <SectionHeading level="section" title="Data Source" className="mt-0" />
 
                 <p className="text-muted">
                     Team Umalysis reads Team Trials JSON files directly in your browser.
@@ -86,13 +88,26 @@ export default function SettingsPage() {
                     </Button>
                 </div>
 
-                <Alert variant="secondary" className="mb-0">
+                <Alert variant="secondary" className="mb-4">
                     <strong>Last loaded:</strong> {lastLoadedText}
                     <br />
                     <strong>Loaded files:</strong> {loading && progress.total > 0 ? progress.loaded : index.length}
                     <br />
                     <strong>Detected player:</strong> {activeTrainer || 'pending load'}
                 </Alert>
+            </div>
+
+            <div className="settings-card mt-3">
+                <SectionHeading level="section" title="Advanced" className="mt-0" />
+
+                <Form.Check
+                    type="checkbox"
+                    id="debug-mode"
+                    checked={debugMode}
+                    onChange={(e) => setDebugMode(e.target.checked)}
+                    label="Debug mode"
+                    className="mb-2"
+                />
             </div>
         </Container>
     );
