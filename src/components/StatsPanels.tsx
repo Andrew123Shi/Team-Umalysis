@@ -1,4 +1,5 @@
-import { Card } from 'react-bootstrap';
+import { Button, ButtonGroup, Card } from 'react-bootstrap';
+import { useState } from 'react';
 import type { ReactNode } from 'react';
 
 import type { AggregatedStats, TTRound, UmaEntry } from '../analytics/types';
@@ -25,14 +26,52 @@ import { formatScore } from '../utils/formatScore';
 
 import StyleCompositionChart from './charts/StyleCompositionChart';
 
+export type StatsScope = 'recent' | 'overall';
+type OverviewSectionKey = 'summary' | 'progression' | 'opponentCharacteristics' | 'skill' | 'racetrack' | 'uma';
+type OverviewSectionScopes = Record<OverviewSectionKey, StatsScope>;
+
+const DEFAULT_OVERVIEW_SECTION_SCOPES: OverviewSectionScopes = {
+    summary: 'recent',
+    progression: 'recent',
+    opponentCharacteristics: 'recent',
+    skill: 'recent',
+    racetrack: 'recent',
+    uma: 'recent',
+};
+
+export function StatsScopeToggle({
+    value,
+    onChange,
+}: {
+    value: StatsScope;
+    onChange: (value: StatsScope) => void;
+}) {
+    return (
+        <ButtonGroup size="sm">
+            <Button
+                variant={value === 'recent' ? 'secondary' : 'outline-secondary'}
+                onClick={() => onChange('recent')}
+            >
+                Recent
+            </Button>
+            <Button
+                variant={value === 'overall' ? 'secondary' : 'outline-secondary'}
+                onClick={() => onChange('overall')}
+            >
+                Overall
+            </Button>
+        </ButtonGroup>
+    );
+}
+
 function DistanceWinRatesPanel({ stats }: { stats: AggregatedStats }) {
     return (
         <Card className="app-card h-100">
             <Card.Body>
                 <SectionHeading title="Distance Win Rates" compact className="mt-0" />
-                <div className="row g-2">
+                <div className="distance-win-rates-grid">
                     {stats.distanceWinRates.map((d) => (
-                        <div key={d.distance} className="col">
+                        <div key={d.distance} className="distance-win-rate-cell">
                             <WinRatePieCard
                                 title={d.distance}
                                 value={d.winRate}
@@ -56,11 +95,13 @@ function AnalyticsSection({
     showHeader,
     title,
     subtitle,
+    actions,
     children,
 }: {
     showHeader: boolean;
     title: string;
     subtitle?: string;
+    actions?: ReactNode;
     children: ReactNode;
 }) {
     if (!showHeader) {
@@ -68,7 +109,14 @@ function AnalyticsSection({
     }
     return (
         <section className="analytics-section">
-            <SectionHeading level="section" title={title} subtitle={subtitle} />
+            {actions ? (
+                <div className="section-heading-action-row">
+                    <SectionHeading level="section" title={title} subtitle={subtitle} />
+                    {actions}
+                </div>
+            ) : (
+                <SectionHeading level="section" title={title} subtitle={subtitle} />
+            )}
             {children}
         </section>
     );
@@ -78,6 +126,10 @@ function AnalyticsSection({
 export default function StatsPanels({
 
     stats,
+    summaryStats = stats,
+    summaryScope,
+    onSummaryScopeChange,
+    recentStats,
 
     viewMode = 'team',
 
@@ -94,6 +146,10 @@ export default function StatsPanels({
 }: {
 
     stats: AggregatedStats;
+    summaryStats?: AggregatedStats;
+    summaryScope?: StatsScope;
+    onSummaryScopeChange?: (value: StatsScope) => void;
+    recentStats?: AggregatedStats;
 
     viewMode?: StatCardViewMode | 'distance';
 
@@ -120,33 +176,67 @@ export default function StatsPanels({
     const isTeamView = viewMode === 'team';
     const showSectionHeaders = !isDistanceView;
     const showOverviewPerformanceExtras = showDistanceWinRates && isTeamView;
+    const [overviewSectionScopes, setOverviewSectionScopes] = useState<OverviewSectionScopes>(
+        DEFAULT_OVERVIEW_SECTION_SCOPES,
+    );
+    const showOverviewScopeControls = isTeamView && showDistanceWinRates && recentStats !== undefined;
+    const overviewStatsFor = (section: OverviewSectionKey): AggregatedStats => (
+        showOverviewScopeControls && overviewSectionScopes[section] === 'recent'
+            ? recentStats
+            : stats
+    );
+    const overviewActionsFor = (section: OverviewSectionKey): ReactNode | undefined => {
+        if (!showOverviewScopeControls) return undefined;
+        return (
+            <StatsScopeToggle
+                value={overviewSectionScopes[section]}
+                onChange={(value) => setOverviewSectionScopes((current) => ({
+                    ...current,
+                    [section]: value,
+                }))}
+            />
+        );
+    };
+    const summaryDisplayStats = showOverviewScopeControls
+        ? overviewStatsFor('summary')
+        : summaryStats;
+    const summaryActions = summaryScope && onSummaryScopeChange ? (
+        <StatsScopeToggle value={summaryScope} onChange={onSummaryScopeChange} />
+    ) : overviewActionsFor('summary');
 
-    const opponentChart = (
+    const buildOpponentChart = (chartStats: AggregatedStats) => (
         <AverageStatsComparisonChart
             showTeamRating={!isDistanceView}
             opponent={{
                 stats: {
-                    speed: stats.opponentStats.speed.avg,
-                    stamina: stats.opponentStats.stamina.avg,
-                    pow: stats.opponentStats.pow.avg,
-                    guts: stats.opponentStats.guts.avg,
-                    wiz: stats.opponentStats.wiz.avg,
+                    speed: chartStats.opponentStats.speed.avg,
+                    stamina: chartStats.opponentStats.stamina.avg,
+                    pow: chartStats.opponentStats.pow.avg,
+                    guts: chartStats.opponentStats.guts.avg,
+                    wiz: chartStats.opponentStats.wiz.avg,
                 },
-                rankScore: stats.opponentStats.rankScore.avg,
-                teamRating: stats.opponentStats.teamRating.avg,
+                rankScore: chartStats.opponentStats.rankScore.avg,
+                teamRating: chartStats.opponentStats.teamRating.avg,
             }}
             npc={{
                 stats: {
-                    speed: stats.npcStats.speed.avg,
-                    stamina: stats.npcStats.stamina.avg,
-                    pow: stats.npcStats.pow.avg,
-                    guts: stats.npcStats.guts.avg,
-                    wiz: stats.npcStats.wiz.avg,
+                    speed: chartStats.npcStats.speed.avg,
+                    stamina: chartStats.npcStats.stamina.avg,
+                    pow: chartStats.npcStats.pow.avg,
+                    guts: chartStats.npcStats.guts.avg,
+                    wiz: chartStats.npcStats.wiz.avg,
                 },
-                rankScore: stats.npcStats.rankScore.avg,
+                rankScore: chartStats.npcStats.rankScore.avg,
             }}
         />
     );
+    const opponentChart = buildOpponentChart(stats);
+    const summaryOpponentChart = buildOpponentChart(summaryDisplayStats);
+    const progressionStats = overviewStatsFor('progression');
+    const opponentCharacteristicsStats = overviewStatsFor('opponentCharacteristics');
+    const skillStats = overviewStatsFor('skill');
+    const racetrackStats = overviewStatsFor('racetrack');
+    const umaStats = overviewStatsFor('uma');
 
     return (
 
@@ -155,6 +245,7 @@ export default function StatsPanels({
             <AnalyticsSection
                 showHeader={showSectionHeaders}
                 title={isUmaView ? 'Uma Profile' : 'Summary'}
+                actions={!isUmaView ? summaryActions : undefined}
             >
 
                 {isUmaView && profileUma ? (
@@ -197,19 +288,19 @@ export default function StatsPanels({
                     </div>
                 ) : (
                     <StatCards
-                        stats={stats}
+                        stats={summaryDisplayStats}
                         viewMode={viewMode as StatCardViewMode}
                         showSessionWinRate={viewMode !== 'distance' && !isUmaView}
                         showAvgPlacement={viewMode === 'uma'}
                         showTeamScorePerRound={false}
                         distanceWinRatesPanel={showOverviewPerformanceExtras
-                            ? <DistanceWinRatesPanel stats={stats} />
+                            ? <DistanceWinRatesPanel stats={summaryDisplayStats} />
                             : undefined}
                         opponentStrengthPanel={isDistanceView ? (
                             <Card className="app-card h-100">
                                 <Card.Body>
                                     <SectionHeading title="Opponent Strength" compact className="mt-0" />
-                                    {opponentChart}
+                                    {summaryOpponentChart}
                                 </Card.Body>
                             </Card>
                         ) : undefined}
@@ -246,25 +337,26 @@ export default function StatsPanels({
             <AnalyticsSection
                 showHeader={showSectionHeaders}
                 title="Progression Trends"
+                actions={overviewActionsFor('progression')}
             >
 
                 <Card className="app-card mb-3">
 
                     <Card.Body>
 
-                        <ScoreTrendChart stats={stats} viewMode={viewMode as StatCardViewMode} />
+                        <ScoreTrendChart stats={progressionStats} viewMode={viewMode as StatCardViewMode} />
 
                     </Card.Body>
 
                 </Card>
 
-                {!isUmaView && stats.scoreTrend.length > 0 && (
+                {!isUmaView && progressionStats.scoreTrend.length > 0 && (
 
                     <Card className="app-card">
 
                         <Card.Body>
 
-                            <TeamRatingTrendChart stats={stats} />
+                            <TeamRatingTrendChart stats={progressionStats} />
 
                         </Card.Body>
 
@@ -278,6 +370,7 @@ export default function StatsPanels({
                 <AnalyticsSection
                     showHeader={showSectionHeaders}
                     title="Opponent Characteristics"
+                    actions={overviewActionsFor('opponentCharacteristics')}
                 >
 
                     <div className="row g-3 opponent-characteristics-layout">
@@ -286,11 +379,11 @@ export default function StatsPanels({
                                 <Card.Body>
                                     <SectionHeading title="Opponent Style Composition" compact className="mt-0" />
                                     <StyleCompositionChart
-                                        opponent={stats.opponentStyleComposition}
-                                        npcPercent={stats.npcStyleComposition}
-                                        npcAvgCount={stats.npcStyleCompositionAvgCount}
-                                        roomPercent={stats.roomStyleComposition}
-                                        roomAvgCount={stats.roomStyleCompositionAvgCount}
+                                        opponent={opponentCharacteristicsStats.opponentStyleComposition}
+                                        npcPercent={opponentCharacteristicsStats.npcStyleComposition}
+                                        npcAvgCount={opponentCharacteristicsStats.npcStyleCompositionAvgCount}
+                                        roomPercent={opponentCharacteristicsStats.roomStyleComposition}
+                                        roomAvgCount={opponentCharacteristicsStats.roomStyleCompositionAvgCount}
                                     />
                                 </Card.Body>
                             </Card>
@@ -300,7 +393,7 @@ export default function StatsPanels({
                                 <Card.Body>
                                     <SectionHeading title="Opponent Strength" compact className="mt-0" />
                                     <div className="composition-chart-toolbar" aria-hidden="true" />
-                                    {opponentChart}
+                                    {buildOpponentChart(opponentCharacteristicsStats)}
                                 </Card.Body>
                             </Card>
                         </div>
@@ -313,13 +406,14 @@ export default function StatsPanels({
             <AnalyticsSection
                 showHeader={showSectionHeaders}
                 title="Skill Analysis"
+                actions={overviewActionsFor('skill')}
             >
 
                 <div className="row g-3">
 
                     <div className={COL_HALF}>
 
-                        <SkillTable title="Skill Activations" skills={stats.playerSkillActivations} mode="player" />
+                        <SkillTable title="Skill Activations" skills={skillStats.playerSkillActivations} mode="player" />
 
                     </div>
 
@@ -327,7 +421,7 @@ export default function StatsPanels({
 
                         <div className={COL_HALF}>
 
-                            <SkillTable title="Most Common Opponent Skills" skills={stats.opponentSkills} mode="opponent" />
+                            <SkillTable title="Most Common Opponent Skills" skills={skillStats.opponentSkills} mode="opponent" />
 
                         </div>
 
@@ -340,6 +434,7 @@ export default function StatsPanels({
             <AnalyticsSection
                 showHeader={showSectionHeaders}
                 title="Racetrack Analysis"
+                actions={overviewActionsFor('racetrack')}
             >
 
                 <div className="row g-3">
@@ -348,7 +443,7 @@ export default function StatsPanels({
 
                         <MatchupTable
 
-                            entries={stats.trackMatchups}
+                            entries={racetrackStats.trackMatchups}
 
                             title="Relative Overperformance"
 
@@ -364,7 +459,7 @@ export default function StatsPanels({
 
                         <MatchupTable
 
-                            entries={stats.trackMatchups}
+                            entries={racetrackStats.trackMatchups}
 
                             title="Relative Underperformance"
 
@@ -385,6 +480,7 @@ export default function StatsPanels({
             <AnalyticsSection
                 showHeader={showSectionHeaders}
                 title="Uma Analysis"
+                actions={overviewActionsFor('uma')}
             >
 
                 <div className="row g-3">
@@ -395,7 +491,7 @@ export default function StatsPanels({
 
                             <MatchupTable
 
-                                entries={stats.matchups}
+                                entries={umaStats.matchups}
 
                                 title="Most Common Opponents"
 
@@ -417,7 +513,7 @@ export default function StatsPanels({
 
                         <MatchupTable
 
-                            entries={stats.matchups}
+                            entries={umaStats.matchups}
 
                             title="Relative Overperformance"
 
@@ -435,7 +531,7 @@ export default function StatsPanels({
 
                         <MatchupTable
 
-                            entries={stats.matchups}
+                            entries={umaStats.matchups}
 
                             title="Relative Underperformance"
 

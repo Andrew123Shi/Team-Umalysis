@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Card, Col, Row } from 'react-bootstrap';
 import type { AggregatedStats, NumericSummary } from '../../analytics/types';
 import { formatScore } from '../../utils/formatScore';
+import { AnimatedText } from '../AnimatedNumber';
 import SectionHeading from '../SectionHeading';
 import { WinRateDonut, WinRateLegend, WinRateRings } from './WinRatePies';
 
@@ -45,11 +46,11 @@ function SummaryCard({
         <Card className="app-card h-100">
             <Card.Body>
                 <SectionHeading level="card" title={title} />
-                <div className="metric-value">{avgDisplay}{suffix}</div>
+                <div className="metric-value"><AnimatedText text={`${avgDisplay}${suffix}`} /></div>
                 <div className="small metric-detail">
-                    {minMaxLine}
+                    <AnimatedText text={minMaxLine} />
                 </div>
-                {!hideCount && <div className="small metric-detail">n={summary.count}</div>}
+                {!hideCount && <div className="small metric-detail"><AnimatedText text={`n=${summary.count}`} /></div>}
             </Card.Body>
         </Card>
     );
@@ -79,22 +80,22 @@ function ScoreSummary({
             <Card.Body>
                 <SectionHeading title={title} compact className="mt-0" />
                 <div className="score-summary-layout">
-                    <div className="metric-value">{formatScore(avg)}</div>
+                    <div className="metric-value"><AnimatedText text={formatScore(avg)} /></div>
                     <div className="score-summary-details">
-                        <span><strong>Med</strong> {formatScore(median)}</span>
+                        <span><strong>Med</strong> <AnimatedText text={formatScore(median)} /></span>
                         {compact ? (
                             <div className="score-summary-minmax">
-                                <span><strong>Min</strong> {formatScore(min)}</span>
-                                <span><strong>Max</strong> {formatScore(max)}</span>
+                                <span><strong>Min</strong> <AnimatedText text={formatScore(min)} /></span>
+                                <span><strong>Max</strong> <AnimatedText text={formatScore(max)} /></span>
                             </div>
                         ) : (
                             <>
-                                <span><strong>Min</strong> {formatScore(min)}</span>
-                                <span><strong>Max</strong> {formatScore(max)}</span>
+                                <span><strong>Min</strong> <AnimatedText text={formatScore(min)} /></span>
+                                <span><strong>Max</strong> <AnimatedText text={formatScore(max)} /></span>
                             </>
                         )}
                         {rawAvg !== undefined && (
-                            <span><strong>Raw Avg</strong> {formatScore(rawAvg)}</span>
+                            <span><strong>Raw Avg</strong> <AnimatedText text={formatScore(rawAvg)} /></span>
                         )}
                     </div>
                 </div>
@@ -125,7 +126,7 @@ function RaceWinRateCard({
                 <div className="win-rate-card-layout">
                     <WinRateRings winRate={winRate} top2Rate={top2} top3Rate={top3} />
                     <div className="win-rate-count">
-                        <strong>{raceWins}/{raceCount}</strong>
+                        <strong><AnimatedText text={`${raceWins}/${raceCount}`} /></strong>
                         <span>Races Won</span>
                     </div>
                     <WinRateLegend
@@ -168,9 +169,10 @@ function TeamWinRatesCard({
                         <div className="win-rate-card-layout">
                             <WinRateDonut value={stats.sessionWinRate} />
                             <div className="win-rate-count">
-                                <strong>{Math.round(stats.sessionWinRate * stats.totalSessions)}/{stats.totalSessions}</strong>
+                                <strong><AnimatedText text={`${Math.round(stats.sessionWinRate * stats.totalSessions)}/${stats.totalSessions}`} /></strong>
                                 <span>Trials Won</span>
                             </div>
+                            <div className="win-rate-legend-spacer" aria-hidden="true" />
                         </div>
                     </div>
                     <div className="win-rate-panel">
@@ -178,7 +180,7 @@ function TeamWinRatesCard({
                         <div className="win-rate-card-layout">
                             <WinRateRings winRate={primaryWinRate} top2Rate={primaryTop2} top3Rate={primaryTop3} />
                             <div className="win-rate-count">
-                                <strong>{raceWins}/{raceCount}</strong>
+                                <strong><AnimatedText text={`${raceWins}/${raceCount}`} /></strong>
                                 <span>Races Won</span>
                             </div>
                             <WinRateLegend
@@ -325,7 +327,7 @@ export default function StatCards({
                         <Card.Body>
                             <SectionHeading title="Number of Races" compact className="mt-0" />
                             <div className="score-summary-layout">
-                                <div className="metric-value">{stats.totalRounds}</div>
+                                <div className="metric-value"><AnimatedText text={String(stats.totalRounds)} /></div>
                             </div>
                         </Card.Body>
                     </Card>
@@ -416,7 +418,7 @@ export default function StatCards({
                             <div>
                                 {isTeamView && (
                                     <div className="win-rate-count mb-2">
-                                        <strong>{raceWins}/{raceCount}</strong>
+                                        <strong><AnimatedText text={`${raceWins}/${raceCount}`} /></strong>
                                         <span>Races Won</span>
                                     </div>
                                 )}
@@ -442,7 +444,7 @@ export default function StatCards({
                             <div className="win-rate-card-layout">
                                 <WinRateDonut value={stats.sessionWinRate} />
                                 <div className="win-rate-count">
-                                    <strong>{stats.playerRoundWins}/{stats.totalRounds}</strong>
+                                    <strong><AnimatedText text={`${stats.playerRoundWins}/${stats.totalRounds}`} /></strong>
                                     <span>Rounds Won</span>
                                 </div>
                             </div>
@@ -479,7 +481,7 @@ export default function StatCards({
                     <Card className="app-card h-100">
                         <Card.Body>
                             <SectionHeading level="card" title="Number of Races" />
-                            <div className="metric-value">{stats.totalRounds}</div>
+                            <div className="metric-value"><AnimatedText text={String(stats.totalRounds)} /></div>
                         </Card.Body>
                     </Card>
                 </Col>

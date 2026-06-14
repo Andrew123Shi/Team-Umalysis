@@ -7,6 +7,7 @@ import { formatScore } from '../../utils/formatScore';
 import { formatUmaDisplayName } from '../../utils/umaDisplayName';
 import { formatRatingHtml } from '../RatingDisplay';
 import { chartTooltipStyle } from './chartTooltip';
+import { CHART_UPDATE_ANIMATION } from './chartLayout';
 import SectionHeading from '../SectionHeading';
 
 const RATING_Y_STEP = 10_000;
@@ -255,6 +256,7 @@ export default function TeamRatingTrendChart({ stats }: { stats: AggregatedStats
 
         return {
             backgroundColor: 'transparent',
+            ...CHART_UPDATE_ANIMATION,
             axisPointer: {
                 link: [{ xAxisIndex: [0] }],
                 animation: false,

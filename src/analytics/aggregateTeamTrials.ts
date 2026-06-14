@@ -34,7 +34,7 @@ const DEFAULT_SCORE_BONUSES: ScoreBonusSettings = {
     supportCard: false,
 };
 
-const ALL_MEMBERS_PLACED_SCORE_ID = 95;
+const TEAM_PLACEMENT_SCORE_IDS = new Set([94, 95]);
 
 function summarize(values: number[]): NumericSummary {
     if (values.length === 0) {
@@ -334,7 +334,7 @@ function scoreEventBonusTotal(events: ScoreEvent[], bonuses: ScoreBonusSettings)
 
 function allMembersPlacedScore(round: TTRound, bonuses: ScoreBonusSettings): number {
     return round.teamScoreEvents
-        .filter((event) => event.rawScoreId === ALL_MEMBERS_PLACED_SCORE_ID)
+        .filter((event) => TEAM_PLACEMENT_SCORE_IDS.has(event.rawScoreId))
         .reduce((sum, event) => sum + scoreEventDisplayScore(event, bonuses), 0);
 }
 

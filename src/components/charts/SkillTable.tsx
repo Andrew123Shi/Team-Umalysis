@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import AssetLoader from '../../data/AssetLoader';
 import UMDatabaseWrapper from '../../data/UMDatabaseWrapper';
+import { AnimatedText } from '../AnimatedNumber';
 import SectionHeading from '../SectionHeading';
 import type { SkillFrequencyEntry } from '../../analytics/types';
 
@@ -157,12 +158,13 @@ export default function SkillTable({
                                 </span>
                                 <span className="bar-row-values">
                                     <span className={`bar-chip${sortKey === 'count' ? ' is-active' : ''}`}>
-                                        {mode === 'opponent'
+                                        <AnimatedText text={mode === 'opponent'
                                             ? `${(s.prevalenceRate * 100).toFixed(1)}%`
                                             : `${s.activated} / ${s.learned}`}
+                                        />
                                     </span>
                                     {mode === 'player' && (
-                                        <span className={`bar-chip${sortKey === 'activationRate' ? ' is-active' : ''}`}>{(s.activationRate * 100).toFixed(1)}%</span>
+                                        <span className={`bar-chip${sortKey === 'activationRate' ? ' is-active' : ''}`}><AnimatedText text={`${(s.activationRate * 100).toFixed(1)}%`} /></span>
                                     )}
                                 </span>
                             </span>

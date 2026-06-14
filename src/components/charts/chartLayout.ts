@@ -11,3 +11,11 @@ export const BAR_CHART_GRID = {
 
 /** Style composition y-axis names need a touch more canvas to match strength plot height. */
 export const STYLE_COMPOSITION_CHART_HEIGHT = BAR_CHART_HEIGHT + 3;
+
+export const CHART_UPDATE_ANIMATION = {
+    animation: true,
+    animationDuration: 240,
+    animationDurationUpdate: 420,
+    animationEasing: 'cubicOut',
+    animationEasingUpdate: 'cubicOut',
+} as const;

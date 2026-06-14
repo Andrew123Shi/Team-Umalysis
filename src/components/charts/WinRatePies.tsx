@@ -1,5 +1,6 @@
 import { useState, type CSSProperties, type MouseEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { AnimatedText } from '../AnimatedNumber';
 
 function clampPct(value: number): number {
     if (!Number.isFinite(value)) return 0;
@@ -109,7 +110,7 @@ export function WinRateDonut({
                 ]}
             />
             <div className="win-rate-donut-core">
-                <div className="win-rate-donut-value">{pctLabel(value)}</div>
+                <div className="win-rate-donut-value"><AnimatedText text={pctLabel(value)} /></div>
                 {label && <div className="win-rate-donut-label">{label}</div>}
             </div>
         </div>
@@ -143,7 +144,7 @@ export function WinRateRings({
                 ]}
             />
             <div className="win-rate-segments-core">
-                <div className="win-rate-segments-value">{pctLabel(winRate)}</div>
+                <div className="win-rate-segments-value"><AnimatedText text={pctLabel(winRate)} /></div>
             </div>
         </div>
     );
@@ -160,7 +161,7 @@ export function WinRateLegend({
                 <span key={item.label} className="win-rate-legend-item">
                     <span className="win-rate-legend-dot" style={{ '--legend-color': item.color } as CSSProperties} />
                     <span>{item.label}</span>
-                    <strong>{pctLabel(item.value)}</strong>
+                    <strong><AnimatedText text={pctLabel(item.value)} /></strong>
                 </span>
             ))}
         </div>

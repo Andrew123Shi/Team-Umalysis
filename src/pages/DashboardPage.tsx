@@ -9,7 +9,7 @@ import {
     getTeamRosterGrid,
 } from '../analytics/aggregateTeamTrials';
 import { DISTANCE_ORDER } from '../analytics/types';
-import type { AggregatedStats } from '../analytics/types';
+import type { AggregatedStats, TTSession } from '../analytics/types';
 import { collectUmaRounds } from '../analytics/styleSaturation';
 import { getLatestUmaEntry, listHistoricalUmas, getCurrentRosterBuildKeys } from '../analytics/umaComparison';
 
@@ -26,11 +26,29 @@ import { useRaceStore } from '../store/RaceStore';
 const SUMMARY_VALUE = '__summary__';
 const HISTORICAL_PLACEHOLDER = '';
 const HISTORICAL_PLACEHOLDER_LABEL = 'Choose historical uma...';
+const RECENT_TRIAL_LIMIT = 100;
 
 function scrollToDashboardTop() {
     requestAnimationFrame(() => {
         window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
     });
+}
+
+function latestTrialSessions(sessions: TTSession[], limit: number): TTSession[] {
+    return sessions
+        .map((session, sessionIndex) => ({ session, sessionIndex }))
+        .sort((a, b) => {
+            const aTime = a.session.savedAt?.getTime();
+            const bTime = b.session.savedAt?.getTime();
+            if (aTime !== undefined && bTime !== undefined && aTime !== bTime) {
+                return bTime - aTime;
+            }
+            if (aTime !== undefined && bTime === undefined) return -1;
+            if (aTime === undefined && bTime !== undefined) return 1;
+            return a.sessionIndex - b.sessionIndex;
+        })
+        .slice(0, limit)
+        .map(({ session }) => session);
 }
 
 export default function DashboardPage() {
@@ -43,11 +61,27 @@ export default function DashboardPage() {
     const showDashboardLoading = sessions.length > 0 && !dashboardReady;
 
     const overallStats = useMemo(() => (sessions.length ? aggregateOverall(sessions, scoreBonuses) : null), [sessions, scoreBonuses]);
+    const recentOverallStats = useMemo(() => {
+        if (!sessions.length) return null;
+        return aggregateOverall(latestTrialSessions(sessions, RECENT_TRIAL_LIMIT), scoreBonuses);
+    }, [sessions, scoreBonuses]);
     const distanceStatsByType = useMemo(() => {
         if (!sessions.length) return null;
         const map = new Map<number, AggregatedStats>();
         DISTANCE_ORDER.forEach((distanceType) => {
             map.set(distanceType, aggregateByDistance(sessions, distanceType, scoreBonuses));
+        });
+        return map;
+    }, [sessions, scoreBonuses]);
+    const recentDistanceStatsByType = useMemo(() => {
+        if (!sessions.length) return null;
+        const map = new Map<number, AggregatedStats>();
+        const recentSessions = latestTrialSessions(sessions, RECENT_TRIAL_LIMIT);
+        DISTANCE_ORDER.forEach((distanceType) => {
+            map.set(
+                distanceType,
+                aggregateByDistance(recentSessions, distanceType, scoreBonuses),
+            );
         });
         return map;
     }, [sessions, scoreBonuses]);
@@ -162,7 +196,13 @@ export default function DashboardPage() {
                         {sessions.length > 0 && dashboardReady && (
                                 <Tab.Content>
                 <Tab.Pane eventKey="overall">
-                    {overallStats && <StatsPanels stats={overallStats} showDistanceWinRates />}
+                    {overallStats && (
+                        <StatsPanels
+                            stats={overallStats}
+                            recentStats={recentOverallStats ?? overallStats}
+                            showDistanceWinRates
+                        />
+                    )}
                 </Tab.Pane>
                 <Tab.Pane eventKey="uma">
                     <Tab.Container activeKey={isSummaryView ? 'summary' : 'profile'}>
@@ -180,17 +220,11 @@ export default function DashboardPage() {
                                         />
                                     </section>
                                 )}
-                                <section className="analytics-section">
-                                    <SectionHeading
-                                        level="section"
-                                        title="Uma Comparison"
-                                    />
-                                    <UmaLeaderboardSection
-                                        sessions={sessions}
-                                        scoreBonuses={scoreBonuses}
-                                        onSelectUma={selectUmaFromLeaderboard}
-                                    />
-                                </section>
+                                <UmaLeaderboardSection
+                                    sessions={sessions}
+                                    scoreBonuses={scoreBonuses}
+                                    onSelectUma={selectUmaFromLeaderboard}
+                                />
                                 <section className="analytics-section historical-uma-section">
                                     <SectionHeading
                                         level="section"
@@ -239,8 +273,11 @@ export default function DashboardPage() {
                     </Tab.Container>
                 </Tab.Pane>
                 <Tab.Pane eventKey="distance">
-                    {distanceStatsByType && (
-                        <DistanceDashboard distanceStats={distanceStatsByType} />
+                    {distanceStatsByType && recentDistanceStatsByType && (
+                        <DistanceDashboard
+                            distanceStats={distanceStatsByType}
+                            recentDistanceStats={recentDistanceStatsByType}
+                        />
                     )}
                 </Tab.Pane>
             </Tab.Content>

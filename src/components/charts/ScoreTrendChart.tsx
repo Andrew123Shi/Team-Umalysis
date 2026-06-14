@@ -8,6 +8,7 @@ import { formatScore } from '../../utils/formatScore';
 import { formatUmaDisplayName } from '../../utils/umaDisplayName';
 import { formatRatingHtml } from '../RatingDisplay';
 import { chartTooltipStyle } from './chartTooltip';
+import { CHART_UPDATE_ANIMATION } from './chartLayout';
 import SectionHeading from '../SectionHeading';
 import { useRaceStore } from '../../store/RaceStore';
 
@@ -351,6 +352,7 @@ export default function ScoreTrendChart({
         if (!showBonusChart) {
             return {
                 backgroundColor: 'transparent',
+                ...CHART_UPDATE_ANIMATION,
                 axisPointer: {
                     link: axisPointerLink,
                     animation: false,
@@ -427,6 +429,7 @@ export default function ScoreTrendChart({
 
         return {
         backgroundColor: 'transparent',
+        ...CHART_UPDATE_ANIMATION,
         axisPointer: {
             link: axisPointerLink,
             animation: false,

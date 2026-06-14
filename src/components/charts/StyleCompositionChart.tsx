@@ -5,7 +5,7 @@ import { Button, ButtonGroup } from 'react-bootstrap';
 import type { StyleComposition } from '../../analytics/types';
 import { STYLE_SATURATION_COLORS } from '../../analytics/styleSaturation';
 import { chartTooltipStyle } from './chartTooltip';
-import { BAR_CHART_GRID, STYLE_COMPOSITION_CHART_HEIGHT } from './chartLayout';
+import { BAR_CHART_GRID, CHART_UPDATE_ANIMATION, STYLE_COMPOSITION_CHART_HEIGHT } from './chartLayout';
 
 type Mode = 'percent' | 'avgCount';
 
@@ -88,6 +88,7 @@ function buildOption({
 
     return {
         backgroundColor: 'transparent',
+        ...CHART_UPDATE_ANIMATION,
         title: {
             text: title,
             left: 'center',

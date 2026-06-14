@@ -5,7 +5,7 @@ import AssetLoader from '../../data/AssetLoader';
 import RatingDisplay from '../RatingDisplay';
 import TeamRatingDisplay from '../TeamRatingDisplay';
 import { chartTooltipStyle } from './chartTooltip';
-import { BAR_CHART_GRID, BAR_CHART_HEIGHT } from './chartLayout';
+import { BAR_CHART_GRID, BAR_CHART_HEIGHT, CHART_UPDATE_ANIMATION } from './chartLayout';
 
 type StatValues = {
     speed: number;
@@ -40,6 +40,7 @@ function buildOption(title: string, stats: StatValues) {
 
     return {
         backgroundColor: 'transparent',
+        ...CHART_UPDATE_ANIMATION,
         title: {
             text: title,
             left: 'center',

@@ -7,6 +7,7 @@ import { formatScore } from '../../utils/formatScore';
 import { UmaDisplayName } from '../../utils/umaDisplayName';
 import { fallbackAccentColor, useImageAccentColors } from '../../hooks/useImageAccentColors';
 import { getUmaImageColorByCardId } from '../../utils/umaImageColors';
+import { AnimatedText } from '../AnimatedNumber';
 import SectionHeading from '../SectionHeading';
 
 type OccurrenceFilter = 'all' | 'gt1' | 'gt5' | 'gt10';
@@ -144,6 +145,7 @@ function MatchupRows({
     compactColumns = false,
     showNormalizedScore = false,
     scoreColumnLabel,
+    showOccurrenceFilter = variant !== 'track',
 }: {
     entries: MatchupEntry[] | TrackMatchupEntry[];
     title: string;
@@ -155,8 +157,12 @@ function MatchupRows({
     compactColumns?: boolean;
     showNormalizedScore?: boolean;
     scoreColumnLabel?: string;
+    showOccurrenceFilter?: boolean;
 }) {
-    const [occurrenceFilter, setOccurrenceFilter] = useState<OccurrenceFilter>(defaultOccurrenceFilter);
+    const resolvedOccurrenceFilter: OccurrenceFilter = showOccurrenceFilter
+        ? defaultOccurrenceFilter
+        : 'all';
+    const [occurrenceFilter, setOccurrenceFilter] = useState<OccurrenceFilter>(resolvedOccurrenceFilter);
     const [sortKey, setSortKey] = useState<SortKey>(defaultSortKey);
     const [sortDir, setSortDir] = useState<SortDir>(defaultSortDir);
     const rows = useMemo(() => toRows(entries, variant), [entries, variant]);
@@ -170,6 +176,10 @@ function MatchupRows({
         setSortKey(defaultSortKey);
         setSortDir(defaultSortDir);
     }, [defaultSortKey, defaultSortDir, title]);
+
+    useEffect(() => {
+        setOccurrenceFilter(resolvedOccurrenceFilter);
+    }, [resolvedOccurrenceFilter, title]);
 
     const handleSort = (key: SortKey) => {
         if (sortKey === key) {
@@ -213,36 +223,38 @@ function MatchupRows({
 
     return (
         <div className="app-card p-3 mb-4">
-            <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+            <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
                 <SectionHeading title={title} compact />
-                <ButtonGroup size="sm">
-                    <Button
-                        variant={occurrenceFilter === 'all' ? 'secondary' : 'outline-secondary'}
-                        onClick={() => setOccurrenceFilter('all')}
-                    >
-                        All
-                    </Button>
-                    <Button
-                        variant={occurrenceFilter === 'gt1' ? 'secondary' : 'outline-secondary'}
-                        onClick={() => setOccurrenceFilter('gt1')}
-                    >
-                        &gt;1%
-                    </Button>
-                    <Button
-                        variant={occurrenceFilter === 'gt5' ? 'secondary' : 'outline-secondary'}
-                        onClick={() => setOccurrenceFilter('gt5')}
-                    >
-                        &gt;5%
-                    </Button>
-                    <Button
-                        variant={occurrenceFilter === 'gt10' ? 'secondary' : 'outline-secondary'}
-                        onClick={() => setOccurrenceFilter('gt10')}
-                    >
-                        &gt;10%
-                    </Button>
-                </ButtonGroup>
+                {showOccurrenceFilter && (
+                    <ButtonGroup size="sm" className="ms-auto flex-shrink-0">
+                        <Button
+                            variant={occurrenceFilter === 'all' ? 'secondary' : 'outline-secondary'}
+                            onClick={() => setOccurrenceFilter('all')}
+                        >
+                            All
+                        </Button>
+                        <Button
+                            variant={occurrenceFilter === 'gt1' ? 'secondary' : 'outline-secondary'}
+                            onClick={() => setOccurrenceFilter('gt1')}
+                        >
+                            &gt;1%
+                        </Button>
+                        <Button
+                            variant={occurrenceFilter === 'gt5' ? 'secondary' : 'outline-secondary'}
+                            onClick={() => setOccurrenceFilter('gt5')}
+                        >
+                            &gt;5%
+                        </Button>
+                        <Button
+                            variant={occurrenceFilter === 'gt10' ? 'secondary' : 'outline-secondary'}
+                            onClick={() => setOccurrenceFilter('gt10')}
+                        >
+                            &gt;10%
+                        </Button>
+                    </ButtonGroup>
+                )}
             </div>
-            <div className="bar-table-toolbar is-sort-right">
+            <div className="bar-table-toolbar">
                 <div className="bar-sort-controls">
                     <SortButton label={label} sortKey="displayName" activeKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                     <SortButton label={instancesLabel} sortKey="appearances" activeKey={sortKey} sortDir={sortDir} onSort={handleSort} title={compactColumns ? 'Instances' : undefined} />
@@ -291,11 +303,11 @@ function MatchupRows({
                                     </span>
                                 </span>
                                 <span className="bar-row-values">
-                                    <span className={`bar-chip${sortKey === 'appearances' ? ' is-active' : ''}`}>{e.appearances} Instances</span>
-                                    <span className={`bar-chip${sortKey === 'avgPlacement' ? ' is-active' : ''}`}>{e.avgPlacement.toFixed(2)}</span>
-                                    <span className={`bar-chip${sortKey === 'winRate' ? ' is-active' : ''}`}>{(e.winRate * 100).toFixed(1)}%</span>
+                                    <span className={`bar-chip${sortKey === 'appearances' ? ' is-active' : ''}`}><AnimatedText text={`${e.appearances} Instances`} /></span>
+                                    <span className={`bar-chip${sortKey === 'avgPlacement' ? ' is-active' : ''}`}><AnimatedText text={e.avgPlacement.toFixed(2)} /></span>
+                                    <span className={`bar-chip${sortKey === 'winRate' ? ' is-active' : ''}`}><AnimatedText text={`${(e.winRate * 100).toFixed(1)}%`} /></span>
                                     {showScoreColumn && (
-                                        <span className={`bar-chip${sortKey === 'avgNormalizedScore' ? ' is-active' : ''}`}>{formatScore(e.avgNormalizedScore ?? 0)}</span>
+                                        <span className={`bar-chip${sortKey === 'avgNormalizedScore' ? ' is-active' : ''}`}><AnimatedText text={formatScore(e.avgNormalizedScore ?? 0)} /></span>
                                     )}
                                 </span>
                             </span>
@@ -317,6 +329,8 @@ export default function MatchupTable({
     defaultOccurrenceFilter = 'gt1',
     compactColumns = false,
     showNormalizedScore = false,
+    scoreColumnLabel,
+    showOccurrenceFilter,
 }: {
     entries: MatchupEntry[] | TrackMatchupEntry[];
     title: string;
@@ -327,6 +341,8 @@ export default function MatchupTable({
     defaultOccurrenceFilter?: OccurrenceFilter;
     compactColumns?: boolean;
     showNormalizedScore?: boolean;
+    scoreColumnLabel?: string;
+    showOccurrenceFilter?: boolean;
 }) {
     return (
         <MatchupRows
@@ -339,6 +355,8 @@ export default function MatchupTable({
             defaultOccurrenceFilter={defaultOccurrenceFilter}
             compactColumns={compactColumns}
             showNormalizedScore={showNormalizedScore}
+            scoreColumnLabel={scoreColumnLabel}
+            showOccurrenceFilter={showOccurrenceFilter}
         />
     );
 }

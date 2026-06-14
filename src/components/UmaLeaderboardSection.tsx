@@ -3,6 +3,7 @@ import { Button, ButtonGroup, Col, Row } from 'react-bootstrap';
 
 import { buildUmaComparisonEntries } from '../analytics/umaComparison';
 import type { ScoreBonusSettings, TTSession } from '../analytics/types';
+import SectionHeading from './SectionHeading';
 import UmaRankTable, {
     fmtAvgActivationRow,
     fmtNormScoreRow,
@@ -117,8 +118,12 @@ export default function UmaLeaderboardSection({ sessions, scoreBonuses, onSelect
     }), [entries]);
 
     return (
-        <>
-            <div className="d-flex flex-wrap align-items-center justify-content-end gap-2 mb-3">
+        <section className="analytics-section">
+            <div className="section-heading-action-row">
+                <SectionHeading
+                    level="section"
+                    title="Uma Comparison"
+                />
                 <ButtonGroup size="sm">
                     <Button
                         variant={rosterOnly ? 'secondary' : 'outline-secondary'}
@@ -286,6 +291,6 @@ export default function UmaLeaderboardSection({ sessions, scoreBonuses, onSelect
                         />
                     </Col>
             </Row>
-        </>
+        </section>
     );
 }

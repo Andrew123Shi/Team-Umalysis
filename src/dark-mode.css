@@ -651,15 +651,6 @@ body {
   --uma-rank-num-col-width: 7.5rem;
 }
 
-.uma-rank-table .bar-table-toolbar {
-  flex-direction: column;
-  align-items: stretch;
-}
-
-.uma-rank-table .bar-sort-controls {
-  justify-content: flex-end;
-}
-
 .uma-rank-table .bar-row-content {
   min-height: 0;
   padding: 0.5rem 0.75rem 0.5rem 0.5rem;
@@ -986,7 +977,7 @@ body {
   stroke-linecap: butt;
   stroke-width: 14;
   cursor: default;
-  transition: filter 0.15s ease, stroke-width 0.15s ease;
+  transition: filter 0.15s ease, stroke-width 0.15s ease, stroke-dasharray 420ms ease, stroke-dashoffset 420ms ease;
 }
 
 .win-rate-svg-segment:hover {
@@ -1110,11 +1101,40 @@ body {
   flex: 1;
   min-height: auto;
   gap: 0.5rem;
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 .overview-win-rate-card .win-rate-comparison-grid {
   gap: 0.65rem;
+  align-items: stretch;
+  flex: 1;
+}
+
+.overview-win-rate-card .win-rate-panel {
+  display: grid;
+  grid-template-rows: auto auto auto minmax(1.6rem, auto);
+  justify-items: center;
+  align-content: start;
+  row-gap: 0.5rem;
+  height: 100%;
+}
+
+.overview-win-rate-card .win-rate-panel-title {
+  margin-bottom: 0;
+}
+
+.overview-win-rate-card .win-rate-panel .win-rate-card-layout {
+  display: contents;
+}
+
+.overview-win-rate-card .win-rate-count {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+}
+
+.overview-win-rate-card .win-rate-legend-spacer {
+  min-height: 1.6rem;
 }
 
 .overview-score-card .card-body {
@@ -1179,6 +1199,43 @@ body {
   background: rgba(255, 255, 255, 0.035);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   text-align: center;
+}
+
+.distance-win-rates-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.distance-win-rate-cell {
+  min-width: 0;
+}
+
+.distance-win-rates-grid .win-rate-pie-card {
+  min-width: 0;
+  padding: clamp(0.5rem, 0.7vw, 0.75rem) clamp(0.3rem, 0.55vw, 0.55rem);
+}
+
+.distance-win-rates-grid .win-rate-donut.is-sm {
+  width: min(100%, clamp(3.65rem, 5.8vw, 6.95rem));
+  height: auto;
+  aspect-ratio: 1;
+}
+
+.distance-win-rates-grid .win-rate-pie-title {
+  max-width: 100%;
+  font-size: clamp(0.72rem, 0.8vw, 0.86rem);
+}
+
+.distance-win-rates-grid .win-rate-pie-detail,
+.distance-win-rates-grid .win-rate-pie-footer {
+  max-width: 100%;
+  font-size: clamp(0.65rem, 0.72vw, 0.78rem);
+}
+
+.distance-win-rates-grid .win-rate-pie-footer {
+  flex-wrap: wrap;
+  row-gap: 0.05rem;
 }
 
 .win-rate-pie-title {
@@ -1652,7 +1709,7 @@ body {
   overflow: hidden;
 }
 
-.distance-jump-nav {
+.distance-sidebar {
   position: sticky;
   top: calc(var(--sticky-subnav-offset) + 1.25rem);
   z-index: 1010;
@@ -1970,6 +2027,23 @@ body {
   margin-bottom: 1.25rem;
 }
 
+.section-heading-action-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.65rem 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.section-heading-action-row .section-heading {
+  flex: 1 1 auto;
+  margin-bottom: 0;
+}
+
+.section-heading-action-row > .btn-group {
+  transform: translateY(0.55rem);
+}
+
 .section-heading.is-panel {
   margin-bottom: 1.1rem;
 }
@@ -2067,6 +2141,18 @@ body {
 .distance-section {
   margin-bottom: 2rem;
   padding-bottom: 0.5rem;
+}
+
+.distance-section > .analytics-section {
+  margin-bottom: 1rem;
+}
+
+.distance-section > .analytics-section:last-child {
+  margin-bottom: 0;
+}
+
+.distance-section .app-card.mb-4 {
+  margin-bottom: 0 !important;
 }
 
 .metric-card {
@@ -2236,6 +2322,34 @@ body {
   border: 1px solid var(--app-border);
   border-radius: var(--app-radius-lg);
   background: var(--app-gradient-panel);
+}
+
+.distance-scope-control {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.45rem;
+  margin-top: 0.75rem;
+  padding: 0.65rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  background: var(--app-gradient-panel);
+}
+
+.distance-scope-control .btn-group {
+  width: 100%;
+}
+
+.distance-scope-control .btn {
+  flex: 1 1 0;
+}
+
+.distance-scope-label {
+  color: var(--app-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .distance-jump-nav .nav-link {
@@ -2413,15 +2527,15 @@ body {
 
 .bar-table-toolbar {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.25rem;
   margin-bottom: 0.75rem;
 }
 
-.bar-table-toolbar.is-sort-right {
+.bar-table-toolbar .bar-sort-controls {
   justify-content: flex-end;
+  width: 100%;
 }
 
 .bar-sort-controls {
@@ -2493,6 +2607,7 @@ body {
   border-radius: var(--app-radius);
   background: rgba(255, 255, 255, 0.035);
   color: var(--app-text-primary);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.24s ease, opacity 0.24s ease, transform 0.24s ease;
 }
 
 button.bar-row {
@@ -2524,6 +2639,7 @@ button.bar-row {
   border-top-left-radius: calc(var(--app-radius) - 1px);
   border-bottom-left-radius: calc(var(--app-radius) - 1px);
   pointer-events: none;
+  transition: width 420ms cubic-bezier(0.22, 1, 0.36, 1), background 260ms ease, border-color 260ms ease;
 }
 
 .bar-row-fill.accent-green {
@@ -2581,6 +2697,7 @@ button.bar-row {
   min-height: calc(2.15rem + 1.1rem);
   padding: 0.55rem 0.75rem;
   line-height: 1.35;
+  transition: opacity 180ms ease, transform 220ms ease;
 }
 
 .bar-row-label {
@@ -2640,6 +2757,7 @@ button.bar-row {
   line-height: 1;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
+  transition: background 180ms ease, border-color 180ms ease, color 180ms ease, transform 180ms ease;
 }
 
 .bar-chip.is-active {
@@ -2652,6 +2770,15 @@ button.bar-row {
   padding: 1rem;
   color: var(--app-text-muted);
   text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar-row,
+  .bar-row-fill,
+  .bar-row-content,
+  .bar-chip {
+    transition: none;
+  }
 }
 
 @media (max-width: 640px) {

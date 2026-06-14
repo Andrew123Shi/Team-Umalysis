@@ -5,6 +5,7 @@ import type { UmaComparisonEntry } from '../analytics/types';
 import { formatScore } from '../utils/formatScore';
 import { fallbackAccentColor, useImageAccentColors } from '../hooks/useImageAccentColors';
 import { getUmaImageColorByCardId } from '../utils/umaImageColors';
+import { AnimatedText } from './AnimatedNumber';
 import SectionHeading from './SectionHeading';
 
 export type UmaRankRow = {
@@ -153,8 +154,8 @@ export default function UmaRankTable({
                                     <span className="bar-row-label-text">{entry.charaName}</span>
                                 </span>
                                 <span className="bar-row-values">
-                                    <span className={`bar-chip${sortKey === 'count' ? ' is-active' : ''}`}>{countLabel}</span>
-                                    <span className={`bar-chip${sortKey === 'value' ? ' is-active' : ''}`}>{valueLabel}</span>
+                                    <span className={`bar-chip${sortKey === 'count' ? ' is-active' : ''}`}><AnimatedText text={countLabel} /></span>
+                                    <span className={`bar-chip${sortKey === 'value' ? ' is-active' : ''}`}><AnimatedText text={valueLabel} /></span>
                                 </span>
                             </span>
                         </>
