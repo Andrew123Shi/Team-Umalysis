@@ -63,6 +63,7 @@ function ScoreSummary({
     median,
     min,
     max,
+    rawAvg,
     compact = false,
 }: {
     title: string;
@@ -70,6 +71,7 @@ function ScoreSummary({
     median: number;
     min: number;
     max: number;
+    rawAvg?: number;
     compact?: boolean;
 }) {
     return (
@@ -90,6 +92,9 @@ function ScoreSummary({
                                 <span><strong>Min</strong> {formatScore(min)}</span>
                                 <span><strong>Max</strong> {formatScore(max)}</span>
                             </>
+                        )}
+                        {rawAvg !== undefined && (
+                            <span><strong>Raw Avg</strong> {formatScore(rawAvg)}</span>
                         )}
                     </div>
                 </div>
@@ -223,6 +228,7 @@ function AverageTotalScoreCard({
                 median={stats.teamScore.median}
                 min={stats.teamScore.min}
                 max={stats.teamScore.max}
+                rawAvg={stats.teamScoreRaw.avg}
                 compact={compact}
             />
         );
@@ -240,10 +246,11 @@ function AverageTotalScoreCard({
     return (
         <ScoreSummary
             title="Average Total Score"
-            avg={stats.raceScoreTotal.avg}
-            median={stats.raceScoreTotal.median}
-            min={stats.raceScoreTotal.min}
-            max={stats.raceScoreTotal.max}
+            avg={stats.raceScoreTotalNormalized.avg}
+            median={stats.raceScoreTotalNormalized.median}
+            min={stats.raceScoreTotalNormalized.min}
+            max={stats.raceScoreTotalNormalized.max}
+            rawAvg={stats.raceScoreTotal.avg}
             compact={compact}
         />
     );

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Button, ButtonGroup, Col, Row } from 'react-bootstrap';
 
 import { buildUmaComparisonEntries } from '../analytics/umaComparison';
-import type { TTSession } from '../analytics/types';
+import type { ScoreBonusSettings, TTSession } from '../analytics/types';
 import UmaRankTable, {
     fmtAvgActivationRow,
     fmtNormScoreRow,
@@ -14,6 +14,7 @@ import UmaRankTable, {
 
 type UmaLeaderboardSectionProps = {
     sessions: TTSession[];
+    scoreBonuses: ScoreBonusSettings;
     onSelectUma?: (buildKey: string) => void;
 };
 
@@ -26,12 +27,12 @@ function buildRows<T extends ReturnType<typeof fmtWinRateRow>>(
     return sortEntries(entries, getValue, direction).map(mapRow);
 }
 
-export default function UmaLeaderboardSection({ sessions, onSelectUma }: UmaLeaderboardSectionProps) {
+export default function UmaLeaderboardSection({ sessions, scoreBonuses, onSelectUma }: UmaLeaderboardSectionProps) {
     const [rosterOnly, setRosterOnly] = useState(true);
 
     const entries = useMemo(
-        () => buildUmaComparisonEntries(sessions, { rosterOnly }),
-        [sessions, rosterOnly],
+        () => buildUmaComparisonEntries(sessions, { rosterOnly, scoreBonuses }),
+        [sessions, rosterOnly, scoreBonuses],
     );
 
     const primaryTables = useMemo(() => ({
@@ -159,7 +160,7 @@ export default function UmaLeaderboardSection({ sessions, onSelectUma }: UmaLead
                     </Col>
                     <Col lg={3} md={6}>
                         <UmaRankTable
-                            title="Top Performers by Normalized Score"
+                            title="Top Performers by Score"
                             rows={primaryTables.topNormScore}
                             valueColumnLabel="Score"
                             defaultSortKey="value"
@@ -170,7 +171,7 @@ export default function UmaLeaderboardSection({ sessions, onSelectUma }: UmaLead
                     </Col>
                     <Col lg={3} md={6}>
                         <UmaRankTable
-                            title="Underperformers by Normalized Score"
+                            title="Underperformers by Score"
                             rows={primaryTables.underNormScore}
                             valueColumnLabel="Score"
                             defaultSortKey="value"

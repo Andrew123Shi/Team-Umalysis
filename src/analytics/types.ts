@@ -24,8 +24,9 @@ export type ScoreEvent = {
     rawScoreId: number;
     num: number;
     score: number;
-    /** Base score before ace / opponent / support bonuses. */
+    /** Base score before ace / opponent / streak / support bonuses. */
     baseScore: number;
+    bonusScores: ScoreBonusBreakdown;
 };
 
 export type ScoreBreakdownSummary = {
@@ -84,6 +85,7 @@ export type UmaEntry = {
     teamMemberId: number;
     teamId: number;
     trainerName: string;
+    supportCardBonus: number;
     runningStyle: number;
     stats: { speed: number; stamina: number; pow: number; guts: number; wiz: number };
     finalGrade: number;
@@ -94,6 +96,7 @@ export type UmaEntry = {
     finishTime: number;
     winMarginLengths?: number;
     totalScore: number;
+    totalBaseScore: number;
     scoreEvents: ScoreEvent[];
     activatedSkillIds: number[];
     motivation: number;
@@ -122,7 +125,9 @@ export type TTRound = {
     courseId?: number;
     selfEvaluate: number;
     opponentEvaluate: number;
+    supportCardBonus: number;
     teamTotalScore: number;
+    teamScoreEvents: ScoreEvent[];
     winType: number;
     consecutiveWins: number;
     playerUmas: UmaEntry[];
@@ -163,6 +168,12 @@ export type NumericSummary = {
     min: number;
     max: number;
 };
+
+export type ScoreBonusKey = 'ace' | 'opponentRating' | 'streak' | 'supportCard';
+
+export type ScoreBonusBreakdown = Record<ScoreBonusKey, number>;
+
+export type ScoreBonusSettings = Record<ScoreBonusKey, boolean>;
 
 export type StyleComposition = {
     front: number;
@@ -264,11 +275,14 @@ export type AggregatedStats = {
     totalRounds: number;
     totalSessions: number;
     playerRoundWins: number;
+    scoreBonuses: ScoreBonusSettings;
     sessionWinRate: number;
     placement: NumericSummary;
     score: NumericSummary;
     raceScoreTotal: NumericSummary;
+    raceScoreTotalNormalized: NumericSummary;
     teamScore: NumericSummary;
+    teamScoreRaw: NumericSummary;
     winRate: number;
     top2Rate: number;
     top3Rate: number;

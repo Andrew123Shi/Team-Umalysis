@@ -124,7 +124,13 @@ function UmaRosterMetrics({ uma }: { uma: RosterUmaSlot }) {
     );
 }
 
-function UmaRosterCard({ uma, onSelect }: { uma: RosterUmaSlot; onSelect?: (buildKey: string) => void }) {
+function UmaRosterCard({
+    uma,
+    onSelect,
+}: {
+    uma: RosterUmaSlot;
+    onSelect?: (buildKey: string) => void;
+}) {
     const outfitName = UMDatabaseWrapper.cards[uma.cardId]?.name;
     const styleLabel = STYLE_SHORT_LABELS[uma.runningStyle] ?? 'Pace';
     const styleColor = STYLE_SATURATION_COLORS[uma.runningStyle] ?? STYLE_SATURATION_COLORS[2];

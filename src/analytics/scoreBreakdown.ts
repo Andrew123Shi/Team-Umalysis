@@ -1,4 +1,4 @@
-import type { ScoreBreakdownSummary, ScoreEvent, UmaEntry } from './types';
+import type { ScoreBonusSettings, ScoreBreakdownSummary, ScoreEvent, UmaEntry } from './types';
 import { getSkillRarityCategory } from './skillUtils';
 
 /** Finish position base scores (1st–12th). */
@@ -89,6 +89,14 @@ export function scoreEventBaseScore(event: ScoreEvent): number {
     return event.score;
 }
 
+function scoreEventDisplayScore(event: ScoreEvent, bonuses: ScoreBonusSettings): number {
+    return scoreEventBaseScore(event)
+        + (bonuses.ace ? (event.bonusScores?.ace ?? 0) : 0)
+        + (bonuses.opponentRating ? (event.bonusScores?.opponentRating ?? 0) : 0)
+        + (bonuses.streak ? (event.bonusScores?.streak ?? 0) : 0)
+        + (bonuses.supportCard ? (event.bonusScores?.supportCard ?? 0) : 0);
+}
+
 function uniqueSkillActivationPoints(entry: UmaEntry): number {
     const uniqueLevels = new Map(
         entry.skills
@@ -123,7 +131,10 @@ export type RaceScoreBreakdown = {
     hasRushed: boolean;
 };
 
-export function breakdownRaceScoreEvents(events: ScoreEvent[]): RaceScoreBreakdown {
+export function breakdownRaceScoreEvents(
+    events: ScoreEvent[],
+    bonuses: ScoreBonusSettings = { ace: false, opponentRating: false, streak: false, supportCard: false },
+): RaceScoreBreakdown {
     const result: RaceScoreBreakdown = {
         finishPositionScore: 0,
         winMarginBonus: 0,
@@ -145,7 +156,7 @@ export function breakdownRaceScoreEvents(events: ScoreEvent[]): RaceScoreBreakdo
     };
 
     events.forEach((event) => {
-        const base = scoreEventBaseScore(event);
+        const base = scoreEventDisplayScore(event, bonuses);
         const id = event.rawScoreId;
 
         if (isFinishPositionId(id)) {
@@ -205,7 +216,10 @@ export function breakdownRaceScoreEvents(events: ScoreEvent[]): RaceScoreBreakdo
     return result;
 }
 
-export function aggregateScoreBreakdown(entries: UmaEntry[]): ScoreBreakdownSummary | null {
+export function aggregateScoreBreakdown(
+    entries: UmaEntry[],
+    bonuses: ScoreBonusSettings = { ace: false, opponentRating: false, streak: false, supportCard: false },
+): ScoreBreakdownSummary | null {
     if (entries.length === 0) return null;
 
     let finishOrderTotal = 0;
@@ -235,7 +249,7 @@ export function aggregateScoreBreakdown(entries: UmaEntry[]): ScoreBreakdownSumm
     const rushedDurationPenalties: number[] = [];
 
     entries.forEach((entry) => {
-        const race = breakdownRaceScoreEvents(entry.scoreEvents);
+        const race = breakdownRaceScoreEvents(entry.scoreEvents, bonuses);
         finishOrderTotal += entry.finishOrder;
         finishPositionTotal += race.finishPositionScore;
         if (entry.finishOrder === 1) {

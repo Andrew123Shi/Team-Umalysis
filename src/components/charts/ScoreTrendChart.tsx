@@ -229,6 +229,7 @@ export default function ScoreTrendChart({
 
     const isDistanceView = viewMode === 'distance';
     const isUmaView = viewMode === 'uma';
+    const isScopedScoreView = isUmaView || isDistanceView;
     const rosterUpdateMarkLines = useMemo(
         () => stats.scoreTrend
             .map((point, index) => (point.rosterUpdate ? { xAxis: index } : null))
@@ -236,21 +237,21 @@ export default function ScoreTrendChart({
         [stats.scoreTrend],
     );
 
-    const activeScores = isUmaView
-        ? normalizedScores
+    const activeScores = isScopedScoreView
+        ? rawScores
         : (mode === 'normalized' ? normalizedScores : rawScores);
-    const activeEma = isUmaView
-        ? normalizedEma
+    const activeEma = isScopedScoreView
+        ? rawEma
         : (mode === 'normalized' ? normalizedEma : rawEma);
 
     const dateInterval = dates.length > 12 ? Math.ceil(dates.length / 8) - 1 : 0;
     const emaLabel = `EMA ${Math.max(1, Math.floor(emaPeriod))}`;
-    const scoreName = isUmaView
-        ? 'Normalized Score'
+    const scoreName = isScopedScoreView
+        ? (isDistanceView ? 'Race Score' : 'Score')
         : mode === 'normalized'
         ? (isDistanceView ? 'Normalized Race Score' : 'Normalized Score')
         : (isDistanceView ? 'Race Score' : 'Total Score');
-    const showBonusChart = !isUmaView;
+    const showBonusChart = !isScopedScoreView;
     const gridLeft = 82;
     const gridRight = 72;
 
@@ -269,29 +270,22 @@ export default function ScoreTrendChart({
         const values: number[] = [];
 
         if (scoreLineVisible) {
-            rawScores.forEach((v) => { if (Number.isFinite(v)) values.push(v); });
-            normalizedScores.forEach((v) => { if (Number.isFinite(v)) values.push(v); });
+            activeScores.forEach((v) => { if (Number.isFinite(v)) values.push(v); });
             if (emaLineVisible) {
-                rawEma.forEach((v) => { if (v != null && Number.isFinite(v)) values.push(v); });
-                normalizedEma.forEach((v) => { if (v != null && Number.isFinite(v)) values.push(v); });
+                activeEma.forEach((v) => { if (v != null && Number.isFinite(v)) values.push(v); });
             }
         } else if (emaLineVisible) {
             activeEma.forEach((v) => { if (v != null && Number.isFinite(v)) values.push(v); });
         }
 
         if (values.length === 0) {
-            rawScores.forEach((v) => { if (Number.isFinite(v)) values.push(v); });
-            normalizedScores.forEach((v) => { if (Number.isFinite(v)) values.push(v); });
-            rawEma.forEach((v) => { if (v != null && Number.isFinite(v)) values.push(v); });
-            normalizedEma.forEach((v) => { if (v != null && Number.isFinite(v)) values.push(v); });
+            activeScores.forEach((v) => { if (Number.isFinite(v)) values.push(v); });
+            activeEma.forEach((v) => { if (v != null && Number.isFinite(v)) values.push(v); });
         }
         return snapScoreYRange(values);
     }, [
         legendSelected,
-        rawScores,
-        normalizedScores,
-        rawEma,
-        normalizedEma,
+        activeScores,
         activeEma,
     ]);
 
@@ -579,7 +573,7 @@ export default function ScoreTrendChart({
         <div>
             <SectionHeading title="Score Progression" compact className="mt-0" />
             <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
-                {!isUmaView && (
+                {!isScopedScoreView && (
                 <ButtonGroup size="sm">
                     <Button
                         variant={mode === 'raw' ? 'secondary' : 'outline-secondary'}
@@ -595,7 +589,7 @@ export default function ScoreTrendChart({
                     </Button>
                 </ButtonGroup>
                 )}
-                {isUmaView && <div />}
+                {isScopedScoreView && <div />}
                 <div className="d-flex align-items-center gap-2">
                     <Form.Label className="text-secondary small mb-0">EMA Period</Form.Label>
                     <Form.Control

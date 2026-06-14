@@ -1,12 +1,14 @@
 import { aggregateScoreBreakdown, countLearnedSkills, countSkillActivations } from './scoreBreakdown';
-import type { ScoreBreakdownSummary, TTSession, UmaComparisonEntry, UmaEntry } from './types';
+import type { ScoreBonusSettings, ScoreBreakdownSummary, TTSession, UmaComparisonEntry, UmaEntry } from './types';
 import { buildUmaFingerprint } from './umaIdentity';
 import { DISTANCE_ORDER } from './types';
 
-function bonusMultiplier(supportCardBonus: number): number {
-    const pct = supportCardBonus / 100;
-    return pct > 0 ? 1 + pct / 100 : 1;
-}
+const DEFAULT_SCORE_BONUSES: ScoreBonusSettings = {
+    ace: false,
+    opponentRating: false,
+    streak: false,
+    supportCard: false,
+};
 
 function primaryDistanceType(counts: Map<number, number>): number {
     let bestType: number = DISTANCE_ORDER[0];
@@ -18,6 +20,18 @@ function primaryDistanceType(counts: Map<number, number>): number {
         }
     });
     return bestType;
+}
+
+function umaDisplayScore(uma: UmaEntry, bonuses: ScoreBonusSettings): number {
+    const baseScore = Number.isFinite(uma.totalBaseScore) ? uma.totalBaseScore : uma.totalScore;
+    const eventBonusTotal = uma.scoreEvents.reduce((sum, event) => (
+        sum
+        + (bonuses.ace ? (event.bonusScores?.ace ?? 0) : 0)
+        + (bonuses.opponentRating ? (event.bonusScores?.opponentRating ?? 0) : 0)
+        + (bonuses.streak ? (event.bonusScores?.streak ?? 0) : 0)
+        + (bonuses.supportCard ? (event.bonusScores?.supportCard ?? 0) : 0)
+    ), 0);
+    return baseScore + eventBonusTotal;
 }
 
 function emptyBreakdown(): ScoreBreakdownSummary {
@@ -91,10 +105,11 @@ export function getCurrentRosterBuildKeys(sessions: TTSession[]): Set<string> {
 
 export function buildUmaComparisonEntries(
     sessions: TTSession[],
-    options?: { rosterOnly?: boolean },
+    options?: { rosterOnly?: boolean; scoreBonuses?: ScoreBonusSettings },
 ): UmaComparisonEntry[] {
     if (sessions.length === 0) return [];
 
+    const bonuses = options?.scoreBonuses ?? DEFAULT_SCORE_BONUSES;
     const rosterKeys = getCurrentRosterBuildKeys(sessions);
     const map = new Map<string, {
         buildKey: string;
@@ -104,14 +119,13 @@ export function buildUmaComparisonEntries(
         rankScore: number;
         stats: UmaEntry['stats'];
         entries: UmaEntry[];
-        normalizedScores: number[];
+        scoreValues: number[];
         wins: number;
         distanceCounts: Map<number, number>;
         lastSeenAt: number | null;
     }>();
 
     sessions.forEach((session) => {
-        const bonus = bonusMultiplier(session.supportCardBonus);
         const sessionTime = session.savedAt?.getTime() ?? null;
         session.rounds.forEach((round) => {
             round.playerUmas.forEach((player) => {
@@ -124,13 +138,13 @@ export function buildUmaComparisonEntries(
                     rankScore: player.rankScore,
                     stats: player.stats,
                     entries: [],
-                    normalizedScores: [],
+                    scoreValues: [],
                     wins: 0,
                     distanceCounts: new Map<number, number>(),
                     lastSeenAt: null,
                 };
                 entry.entries.push(player);
-                entry.normalizedScores.push(player.totalScore / bonus);
+                entry.scoreValues.push(umaDisplayScore(player, bonuses));
                 if (player.finishOrder === 1) entry.wins += 1;
                 entry.distanceCounts.set(
                     round.distanceType,
@@ -146,8 +160,8 @@ export function buildUmaComparisonEntries(
 
     let results = Array.from(map.values()).map((acc): UmaComparisonEntry => {
         const raceCount = acc.entries.length;
-        const breakdown = aggregateScoreBreakdown(acc.entries) ?? emptyBreakdown();
-        const normalizedTotal = acc.normalizedScores.reduce((sum, value) => sum + value, 0);
+        const breakdown = aggregateScoreBreakdown(acc.entries, bonuses) ?? emptyBreakdown();
+        const scoreTotal = acc.scoreValues.reduce((sum, value) => sum + value, 0);
         let totalGoldSkillActivations = 0;
         let totalRegularSkillActivations = 0;
         let totalUniqueSkillActivations = 0;
@@ -174,7 +188,7 @@ export function buildUmaComparisonEntries(
             appearances: raceCount,
             wins: acc.wins,
             winRate: raceCount > 0 ? acc.wins / raceCount : 0,
-            avgNormalizedScore: raceCount > 0 ? normalizedTotal / raceCount : 0,
+            avgNormalizedScore: raceCount > 0 ? scoreTotal / raceCount : 0,
             distanceType: primaryDistanceType(acc.distanceCounts),
             lastSeenAt: acc.lastSeenAt,
             scoreBreakdown: breakdown,
@@ -197,9 +211,9 @@ export function buildUmaComparisonEntries(
     return results;
 }
 
-export function listHistoricalUmas(sessions: TTSession[]): UmaComparisonEntry[] {
+export function listHistoricalUmas(sessions: TTSession[], scoreBonuses?: ScoreBonusSettings): UmaComparisonEntry[] {
     const rosterKeys = getCurrentRosterBuildKeys(sessions);
-    return buildUmaComparisonEntries(sessions)
+    return buildUmaComparisonEntries(sessions, { scoreBonuses })
         .filter((entry) => !rosterKeys.has(entry.buildKey))
         .sort((a, b) => {
             if (a.distanceType !== b.distanceType) return a.distanceType - b.distanceType;

@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
-import type { SessionIndexEntry, TTSession } from '../analytics/types';
+import type { ScoreBonusKey, ScoreBonusSettings, SessionIndexEntry, TTSession } from '../analytics/types';
 
 import { getSessionOpponentTrainer, resolvePlayerIdentity } from '../analytics/umaIdentity';
 import {
@@ -11,6 +11,13 @@ import {
 
 const TRAINER_OVERRIDE_KEY = 'team-umalysis-trainer-name-override';
 const DEBUG_MODE_KEY = 'team-umalysis-debug-mode';
+const SCORE_BONUSES_KEY = 'team-umalysis-score-bonuses';
+const DEFAULT_SCORE_BONUSES: ScoreBonusSettings = {
+    ace: false,
+    opponentRating: false,
+    streak: false,
+    supportCard: false,
+};
 
 type RaceStoreValue = {
     sessions: TTSession[];
@@ -18,6 +25,7 @@ type RaceStoreValue = {
     trainerName: string;
     trainerNameOverride: string;
     debugMode: boolean;
+    scoreBonuses: ScoreBonusSettings;
     dataSource: DataSource | null;
     folderName: string;
     lastLoadedAt: Date | null;
@@ -30,6 +38,7 @@ type RaceStoreValue = {
     reload: () => Promise<void>;
     saveTrainerNameOverride: (value: string) => void;
     setDebugMode: (enabled: boolean) => void;
+    setScoreBonusEnabled: (bonus: ScoreBonusKey, enabled: boolean) => void;
 };
 
 const RaceStoreContext = createContext<RaceStoreValue | null>(null);
@@ -72,6 +81,28 @@ function saveStoredDebugMode(enabled: boolean) {
     }
 }
 
+function loadStoredScoreBonuses(): ScoreBonusSettings {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(SCORE_BONUSES_KEY) ?? '{}') as Partial<ScoreBonusSettings>;
+        return {
+            ace: parsed.ace === true,
+            opponentRating: parsed.opponentRating === true,
+            streak: parsed.streak === true,
+            supportCard: parsed.supportCard === true,
+        };
+    } catch {
+        return DEFAULT_SCORE_BONUSES;
+    }
+}
+
+function saveStoredScoreBonuses(scoreBonuses: ScoreBonusSettings) {
+    try {
+        localStorage.setItem(SCORE_BONUSES_KEY, JSON.stringify(scoreBonuses));
+    } catch {
+        // Ignore storage failures; the setting still applies for this session.
+    }
+}
+
 function isAbortError(err: unknown) {
     return err instanceof DOMException && err.name === 'AbortError';
 }
@@ -97,6 +128,7 @@ export function RaceStoreProvider({ children }: { children: React.ReactNode }) {
     const [trainerName, setTrainerName] = useState('');
     const [trainerNameOverride, setTrainerNameOverride] = useState(loadStoredTrainerNameOverride);
     const [debugMode, setDebugModeState] = useState(loadStoredDebugMode);
+    const [scoreBonuses, setScoreBonuses] = useState<ScoreBonusSettings>(loadStoredScoreBonuses);
     const [dataSource, setDataSource] = useState<DataSource | null>(null);
     const [folderName, setFolderName] = useState('');
     const [lastLoadedAt, setLastLoadedAt] = useState<Date | null>(null);
@@ -190,6 +222,14 @@ export function RaceStoreProvider({ children }: { children: React.ReactNode }) {
         setDebugModeState(enabled);
     }, []);
 
+    const setScoreBonusEnabled = useCallback((bonus: ScoreBonusKey, enabled: boolean) => {
+        setScoreBonuses((current) => {
+            const next = { ...current, [bonus]: enabled };
+            saveStoredScoreBonuses(next);
+            return next;
+        });
+    }, []);
+
     useEffect(() => {
         if (autoLoadStarted) return;
         autoLoadStarted = true;
@@ -204,6 +244,7 @@ export function RaceStoreProvider({ children }: { children: React.ReactNode }) {
         trainerName,
         trainerNameOverride,
         debugMode,
+        scoreBonuses,
         dataSource,
         folderName,
         lastLoadedAt,
@@ -216,12 +257,14 @@ export function RaceStoreProvider({ children }: { children: React.ReactNode }) {
         reload,
         saveTrainerNameOverride,
         setDebugMode,
+        setScoreBonusEnabled,
     }), [
         sessions,
         index,
         trainerName,
         trainerNameOverride,
         debugMode,
+        scoreBonuses,
         dataSource,
         folderName,
         lastLoadedAt,
@@ -234,6 +277,7 @@ export function RaceStoreProvider({ children }: { children: React.ReactNode }) {
         reload,
         saveTrainerNameOverride,
         setDebugMode,
+        setScoreBonusEnabled,
     ]);
 
     return (

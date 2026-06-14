@@ -35,29 +35,29 @@ function scrollToDashboardTop() {
 
 export default function DashboardPage() {
     const [tabsEl, setTabsEl] = useState<HTMLDivElement | null>(null);
-    const { sessions, loading, progress, error, hasTriedSavedFolder, loadFromFolder } = useRaceStore();
+    const { sessions, loading, progress, error, hasTriedSavedFolder, loadFromFolder, scoreBonuses } = useRaceStore();
     const [selectedBuildKey, setSelectedBuildKey] = useState<string>(SUMMARY_VALUE);
     const [historicalSelection, setHistoricalSelection] = useState<string>(HISTORICAL_PLACEHOLDER);
     useStickyOffset(tabsEl, '--sticky-dashboard-tabs-height', true);
     const dashboardReady = useDashboardReady(sessions);
     const showDashboardLoading = sessions.length > 0 && !dashboardReady;
 
-    const overallStats = useMemo(() => (sessions.length ? aggregateOverall(sessions) : null), [sessions]);
+    const overallStats = useMemo(() => (sessions.length ? aggregateOverall(sessions, scoreBonuses) : null), [sessions, scoreBonuses]);
     const distanceStatsByType = useMemo(() => {
         if (!sessions.length) return null;
         const map = new Map<number, AggregatedStats>();
         DISTANCE_ORDER.forEach((distanceType) => {
-            map.set(distanceType, aggregateByDistance(sessions, distanceType));
+            map.set(distanceType, aggregateByDistance(sessions, distanceType, scoreBonuses));
         });
         return map;
-    }, [sessions]);
-    const rosterGrid = useMemo(() => getTeamRosterGrid(sessions), [sessions]);
-    const historicalUmas = useMemo(() => listHistoricalUmas(sessions), [sessions]);
+    }, [sessions, scoreBonuses]);
+    const rosterGrid = useMemo(() => getTeamRosterGrid(sessions, scoreBonuses), [sessions, scoreBonuses]);
+    const historicalUmas = useMemo(() => listHistoricalUmas(sessions, scoreBonuses), [sessions, scoreBonuses]);
     const activeBuildKey = selectedBuildKey !== SUMMARY_VALUE ? selectedBuildKey : historicalSelection || null;
     const umaStats = useMemo(() => {
         if (!sessions.length || !activeBuildKey) return null;
-        return aggregateByUma(sessions, activeBuildKey);
-    }, [sessions, activeBuildKey]);
+        return aggregateByUma(sessions, activeBuildKey, scoreBonuses);
+    }, [sessions, activeBuildKey, scoreBonuses]);
     const umaStyleSaturationRounds = useMemo(() => {
         if (!activeBuildKey) return [];
         return collectUmaRounds(sessions, activeBuildKey);
@@ -187,6 +187,7 @@ export default function DashboardPage() {
                                     />
                                     <UmaLeaderboardSection
                                         sessions={sessions}
+                                        scoreBonuses={scoreBonuses}
                                         onSelectUma={selectUmaFromLeaderboard}
                                     />
                                 </section>

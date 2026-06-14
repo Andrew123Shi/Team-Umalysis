@@ -9,6 +9,8 @@ import type {
     AptitudeSet,
     ParsedRaceView,
     ScoreEvent,
+    ScoreBonusBreakdown,
+    ScoreBonusKey,
     TTSession,
     TTRound,
     UmaEntry,
@@ -23,6 +25,39 @@ import { DISTANCE_LABELS as DISTANCE_MAP } from '../analytics/types';
 
 const RUNAWAY_TRIGGER_SKILL_ID = 202051;
 const METERS_PER_LENGTH = 2.5;
+
+function emptyScoreBonusBreakdown(): ScoreBonusBreakdown {
+    return { ace: 0, opponentRating: 0, streak: 0, supportCard: 0 };
+}
+
+function scoreBonusKey(bonus: any): ScoreBonusKey | null {
+    const id = Number(bonus?.score_bonus_id);
+    if (id === 1) return 'ace';
+    if (id === 2) return 'opponentRating';
+    if (id === 8) return 'supportCard';
+    if (Number(bonus?.condition_type) === 4) return 'streak';
+    return null;
+}
+
+function buildScoreEvents(scoreArray: any[] | undefined): ScoreEvent[] {
+    return (scoreArray ?? []).map((s: any) => {
+        const score = Number(s.score);
+        const bonusScores = emptyScoreBonusBreakdown();
+        const bonusTotal = (s.bonus_array ?? []).reduce((sum: number, bonus: any) => {
+            const bonusScore = Number(bonus.bonus_score) || 0;
+            const key = scoreBonusKey(bonus);
+            if (key) bonusScores[key] += bonusScore;
+            return sum + bonusScore;
+        }, 0);
+        return {
+            rawScoreId: Number(s.raw_score_id),
+            num: Number(s.num),
+            score,
+            baseScore: score - bonusTotal,
+            bonusScores,
+        };
+    });
+}
 
 function charaResultTeamKey(trainedCharaId: number, teamId: number): string {
     return `${trainedCharaId}:${teamId}`;
@@ -220,6 +255,7 @@ function buildUmaEntry(
     horse: any,
     charaResult: any,
     raceData: ParsedRaceView['raceData'],
+    supportCardBonus: number,
     winMarginLengths?: number,
 ): UmaEntry {
     const trained = fromRaceHorseData(horse);
@@ -227,19 +263,7 @@ function buildUmaEntry(
     const charaData = UMDatabaseWrapper.charas[charaId];
     const skillIds = trained.skills.map((s) => s.skillId);
     const runningStyle = resolveRunningStyle(Number(horse.running_style ?? 1), skillIds);
-    const scoreEvents: ScoreEvent[] = (charaResult?.score_array ?? []).map((s: any) => {
-        const score = Number(s.score);
-        const bonusTotal = (s.bonus_array ?? []).reduce(
-            (sum: number, bonus: any) => sum + (Number(bonus.bonus_score) || 0),
-            0,
-        );
-        return {
-            rawScoreId: Number(s.raw_score_id),
-            num: Number(s.num),
-            score,
-            baseScore: score - bonusTotal,
-        };
-    });
+    const scoreEvents = buildScoreEvents(charaResult?.score_array);
     const frameOrder = Number(horse.frame_order);
     const stats = {
         speed: Number(horse.speed ?? trained.speed ?? 0),
@@ -260,6 +284,7 @@ function buildUmaEntry(
         teamMemberId: Number(horse.team_member_id ?? 0),
         teamId: Number(horse.team_id ?? 0),
         trainerName: horse.trainer_name ?? 'NPC',
+        supportCardBonus,
         runningStyle,
         stats,
         finalGrade: Number(horse.final_grade ?? 0),
@@ -270,6 +295,7 @@ function buildUmaEntry(
         finishTime: Number(charaResult?.finish_time ?? 0),
         ...(winMarginLengths !== undefined ? { winMarginLengths } : {}),
         totalScore: scoreEvents.reduce((sum, e) => sum + e.score, 0),
+        totalBaseScore: scoreEvents.reduce((sum, e) => sum + (e.baseScore ?? e.score), 0),
         scoreEvents,
         activatedSkillIds: extractActivatedSkills(raceData, frameOrder),
         motivation: Number(horse.motivation ?? 3),
@@ -386,6 +412,7 @@ export function parseTeamTrialSession(json: any, fileName: string): TTSession | 
                 hydrated,
                 charaResult,
                 parsed.raceData,
+                Number(json.support_card_bonus ?? 0),
                 winMarginsByTrainedCharaId.get(Number(horse.trained_chara_id)),
             );
             if (entry.teamId === playerIdentity.teamId) playerUmas.push(entry);
@@ -401,7 +428,9 @@ export function parseTeamTrialSession(json: any, fileName: string): TTSession | 
             courseId: parsed.detectedCourseId,
             selfEvaluate: Number(start.self_evaluate ?? 0),
             opponentEvaluate: Number(start.opponent_evaluate ?? 0),
+            supportCardBonus: Number(json.support_card_bonus ?? 0),
             teamTotalScore: Number(result.team_total_score ?? 0),
+            teamScoreEvents: buildScoreEvents(result.team_score_array),
             winType: Number(result.win_type ?? 0),
             consecutiveWins: Number(result.current_consecutive_win_count ?? 0),
             playerUmas,

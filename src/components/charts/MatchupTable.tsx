@@ -143,6 +143,7 @@ function MatchupRows({
     defaultOccurrenceFilter = 'gt1',
     compactColumns = false,
     showNormalizedScore = false,
+    scoreColumnLabel,
 }: {
     entries: MatchupEntry[] | TrackMatchupEntry[];
     title: string;
@@ -153,6 +154,7 @@ function MatchupRows({
     defaultOccurrenceFilter?: OccurrenceFilter;
     compactColumns?: boolean;
     showNormalizedScore?: boolean;
+    scoreColumnLabel?: string;
 }) {
     const [occurrenceFilter, setOccurrenceFilter] = useState<OccurrenceFilter>(defaultOccurrenceFilter);
     const [sortKey, setSortKey] = useState<SortKey>(defaultSortKey);
@@ -162,7 +164,7 @@ function MatchupRows({
     const instancesLabel = compactColumns ? 'Inst' : 'Instances';
     const avgPlacementLabel = compactColumns ? 'Avg Pos' : 'Avg. Position';
     const winRateLabel = compactColumns ? 'WR' : 'Win Rate';
-    const avgNormScoreLabel = compactColumns ? 'Avg Scr (N)' : 'Average Score (Norm.)';
+    const avgNormScoreLabel = scoreColumnLabel ?? (compactColumns ? 'Avg Scr' : 'Average Score');
 
     useEffect(() => {
         setSortKey(defaultSortKey);
@@ -253,7 +255,7 @@ function MatchupRows({
                             activeKey={sortKey}
                             sortDir={sortDir}
                             onSort={handleSort}
-                            title={compactColumns ? 'Average Score (Norm.)' : undefined}
+                            title={compactColumns ? (scoreColumnLabel ?? 'Average Score') : undefined}
                         />
                     )}
                 </div>
