@@ -289,6 +289,8 @@ export type AggregatedStats = {
     roundWinRate: number;
     roundTop2Rate: number;
     roundTop3Rate: number;
+    roundAllPodiumRate: number;
+    roundAllPlacedRate: number;
     opponentStyleComposition: StyleComposition;
     npcStyleComposition: StyleComposition;
     roomStyleComposition: StyleComposition;

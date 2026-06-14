@@ -1029,6 +1029,14 @@ body {
   font-weight: 650;
 }
 
+.win-rate-dual-counts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 1.25rem;
+}
+
 .win-rate-count strong {
   color: var(--app-text-primary);
   font-size: 1.15rem;

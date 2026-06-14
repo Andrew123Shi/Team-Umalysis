@@ -174,6 +174,7 @@ export default function StatsPanels({
     const isUmaView = viewMode === 'uma';
     const isDistanceView = viewMode === 'distance';
     const isTeamView = viewMode === 'team';
+    const hideMatchupOutfitName = isDistanceView;
     const showSectionHeaders = !isDistanceView;
     const showOverviewPerformanceExtras = showDistanceWinRates && isTeamView;
     const [overviewSectionScopes, setOverviewSectionScopes] = useState<OverviewSectionScopes>(
@@ -231,7 +232,6 @@ export default function StatsPanels({
         />
     );
     const opponentChart = buildOpponentChart(stats);
-    const summaryOpponentChart = buildOpponentChart(summaryDisplayStats);
     const progressionStats = overviewStatsFor('progression');
     const opponentCharacteristicsStats = overviewStatsFor('opponentCharacteristics');
     const skillStats = overviewStatsFor('skill');
@@ -296,14 +296,6 @@ export default function StatsPanels({
                         distanceWinRatesPanel={showOverviewPerformanceExtras
                             ? <DistanceWinRatesPanel stats={summaryDisplayStats} />
                             : undefined}
-                        opponentStrengthPanel={isDistanceView ? (
-                            <Card className="app-card h-100">
-                                <Card.Body>
-                                    <SectionHeading title="Opponent Strength" compact className="mt-0" />
-                                    {summaryOpponentChart}
-                                </Card.Body>
-                            </Card>
-                        ) : undefined}
                     />
                 )}
             </AnalyticsSection>
@@ -503,6 +495,8 @@ export default function StatsPanels({
 
                                 compactColumns={viewMode === 'distance'}
 
+                                hideOutfitName={hideMatchupOutfitName}
+
                             />
 
                         </div>
@@ -523,6 +517,8 @@ export default function StatsPanels({
 
                             compactColumns={viewMode === 'distance'}
 
+                            hideOutfitName={hideMatchupOutfitName}
+
                         />
 
                     </div>
@@ -540,6 +536,8 @@ export default function StatsPanels({
                             defaultSortDir="asc"
 
                             compactColumns={viewMode === 'distance'}
+
+                            hideOutfitName={hideMatchupOutfitName}
 
                         />
 

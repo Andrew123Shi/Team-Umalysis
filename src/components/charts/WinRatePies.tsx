@@ -117,6 +117,34 @@ export function WinRateDonut({
     );
 }
 
+export function TeamPlacementRings({
+    allPodiumRate,
+    allPlacedRate,
+}: {
+    allPodiumRate: number;
+    allPlacedRate: number;
+}) {
+    const allPodiumPct = clampPct(allPodiumRate);
+    const allPlacedPct = Math.max(allPodiumPct, clampPct(allPlacedRate));
+    const allPlacedOnlyPct = allPlacedPct - allPodiumPct;
+    const notAllPlacedPct = 100 - allPlacedPct;
+
+    return (
+        <div className="win-rate-segments">
+            <DonutSegments
+                segments={[
+                    { label: 'All Podium (1st/2nd/3rd)', value: allPodiumPct, color: '#64b5f6' },
+                    { label: 'All Placed (≤5th)', value: allPlacedOnlyPct, tooltipValue: allPlacedPct, color: '#66bb6a' },
+                    { label: 'Not All Placed', value: notAllPlacedPct, color: '#ef5350' },
+                ]}
+            />
+            <div className="win-rate-segments-core">
+                <div className="win-rate-segments-value"><AnimatedText text={pctLabel(allPlacedRate)} /></div>
+            </div>
+        </div>
+    );
+}
+
 export function WinRateRings({
     winRate,
     top2Rate,

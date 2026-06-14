@@ -618,6 +618,18 @@ export function aggregateStats(
     const roundWins = rounds.filter((r) => r.playerWonRound).length;
     const roundTop2 = roundBestPlacements.filter((p) => p <= 2).length;
     const roundTop3 = roundBestPlacements.filter((p) => p <= 3).length;
+    const roundAllPodium = rounds.filter((round) => {
+        const entries = options?.buildKey !== undefined
+            ? round.playerUmas.filter((u) => u.buildKey === options.buildKey)
+            : round.playerUmas;
+        return entries.length > 0 && entries.every((u) => u.finishOrder <= 3);
+    }).length;
+    const roundAllPlaced = rounds.filter((round) => {
+        const entries = options?.buildKey !== undefined
+            ? round.playerUmas.filter((u) => u.buildKey === options.buildKey)
+            : round.playerUmas;
+        return entries.length > 0 && entries.every((u) => u.finishOrder <= 5);
+    }).length;
 
     const opponentComps = rounds.map((r) => pctStyleComposition(r.opponentUmas));
     const npcComps = rounds.map((r) => pctStyleComposition(r.npcUmas));
@@ -744,6 +756,8 @@ export function aggregateStats(
         roundWinRate: rounds.length > 0 ? roundWins / rounds.length : 0,
         roundTop2Rate: rounds.length > 0 ? roundTop2 / rounds.length : 0,
         roundTop3Rate: rounds.length > 0 ? roundTop3 / rounds.length : 0,
+        roundAllPodiumRate: rounds.length > 0 ? roundAllPodium / rounds.length : 0,
+        roundAllPlacedRate: rounds.length > 0 ? roundAllPlaced / rounds.length : 0,
         opponentStyleComposition: mergeStyleCompositions(opponentComps),
         npcStyleComposition: mergeStyleCompositions(npcComps),
         roomStyleComposition: mergeStyleCompositions(roomComps),

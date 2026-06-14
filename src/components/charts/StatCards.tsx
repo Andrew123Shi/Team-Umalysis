@@ -4,7 +4,7 @@ import type { AggregatedStats, NumericSummary } from '../../analytics/types';
 import { formatScore } from '../../utils/formatScore';
 import { AnimatedText } from '../AnimatedNumber';
 import SectionHeading from '../SectionHeading';
-import { WinRateDonut, WinRateLegend, WinRateRings } from './WinRatePies';
+import { WinRateDonut, WinRateLegend, WinRateRings, TeamPlacementRings } from './WinRatePies';
 
 function fmtNum(v: number, digits = 1) {
     return v.toFixed(digits);
@@ -98,6 +98,48 @@ function ScoreSummary({
                             <span><strong>Raw Avg</strong> <AnimatedText text={formatScore(rawAvg)} /></span>
                         )}
                     </div>
+                </div>
+            </Card.Body>
+        </Card>
+    );
+}
+
+function TeamPlacementRateCard({
+    allPodiumRate,
+    allPlacedRate,
+    raceCount,
+    compact = false,
+}: {
+    allPodiumRate: number;
+    allPlacedRate: number;
+    raceCount: number;
+    compact?: boolean;
+}) {
+    const allPodiumRaces = Math.round(allPodiumRate * raceCount);
+    const allPlacedRaces = Math.round(allPlacedRate * raceCount);
+
+    return (
+        <Card className={`app-card h-100${compact ? ' overview-win-rate-card' : ''}`}>
+            <Card.Body>
+                <SectionHeading title="Team Placement" compact className="mt-0" />
+                <div className="win-rate-card-layout">
+                    <TeamPlacementRings allPodiumRate={allPodiumRate} allPlacedRate={allPlacedRate} />
+                    <div className="win-rate-dual-counts">
+                        <div className="win-rate-count">
+                            <strong><AnimatedText text={`${allPodiumRaces}/${raceCount}`} /></strong>
+                            <span>All Podiumed</span>
+                        </div>
+                        <div className="win-rate-count">
+                            <strong><AnimatedText text={`${allPlacedRaces}/${raceCount}`} /></strong>
+                            <span>All Placed</span>
+                        </div>
+                    </div>
+                    <WinRateLegend
+                        items={[
+                            { label: 'All Podium (1st/2nd/3rd)', value: allPodiumRate, color: '#64b5f6' },
+                            { label: 'All Placed (≤5th)', value: allPlacedRate, color: '#66bb6a' },
+                        ]}
+                    />
                 </div>
             </Card.Body>
         </Card>
@@ -266,7 +308,6 @@ export default function StatCards({
     showTeamScorePerRound = true,
     showRaceCount = false,
     distanceWinRatesPanel,
-    opponentStrengthPanel,
 }: {
     stats: AggregatedStats;
     viewMode?: StatCardViewMode;
@@ -275,13 +316,12 @@ export default function StatCards({
     showTeamScorePerRound?: boolean;
     showRaceCount?: boolean;
     distanceWinRatesPanel?: ReactNode;
-    opponentStrengthPanel?: ReactNode;
 }) {
     const isUmaView = viewMode === 'uma';
     const isDistanceView = viewMode === 'distance';
     const isTeamView = !isUmaView && !isDistanceView;
     const isOverviewLayout = isTeamView && showSessionWinRate && !!distanceWinRatesPanel;
-    const isDistanceLayout = isDistanceView && !!opponentStrengthPanel;
+    const isDistanceLayout = isDistanceView;
     const isUmaOverviewLayout = isUmaView && showRaceCount;
 
     const primaryWinRate = isUmaView ? stats.winRate : stats.roundWinRate;
@@ -340,6 +380,14 @@ export default function StatCards({
         return (
             <Row className="g-3 performance-overview-row">
                 <Col lg={4}>
+                    <AverageTotalScoreCard
+                        stats={stats}
+                        isUmaView={isUmaView}
+                        isDistanceView={isDistanceView}
+                        compact
+                    />
+                </Col>
+                <Col lg={4}>
                     <RaceWinRateCard
                         winRate={primaryWinRate}
                         top2={primaryTop2}
@@ -349,16 +397,13 @@ export default function StatCards({
                         compact
                     />
                 </Col>
-                <Col lg={3}>
-                    <AverageTotalScoreCard
-                        stats={stats}
-                        isUmaView={isUmaView}
-                        isDistanceView={isDistanceView}
+                <Col lg={4}>
+                    <TeamPlacementRateCard
+                        allPodiumRate={stats.roundAllPodiumRate}
+                        allPlacedRate={stats.roundAllPlacedRate}
+                        raceCount={raceCount}
                         compact
                     />
-                </Col>
-                <Col lg={5}>
-                    {opponentStrengthPanel}
                 </Col>
             </Row>
         );

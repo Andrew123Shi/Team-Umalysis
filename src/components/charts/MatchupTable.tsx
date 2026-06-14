@@ -95,10 +95,14 @@ function filterByOccurrence(entries: MatchupRow[], filter: OccurrenceFilter): Ma
     return entries;
 }
 
-function sortEntries(entries: MatchupRow[], sortKey: SortKey, sortDir: SortDir): MatchupRow[] {
+function sortEntries(entries: MatchupRow[], sortKey: SortKey, sortDir: SortDir, hideOutfitName = false): MatchupRow[] {
     const dir = sortDir === 'asc' ? 1 : -1;
     return [...entries].sort((a, b) => {
-        if (sortKey === 'displayName') return a.displayName.localeCompare(b.displayName) * dir;
+        if (sortKey === 'displayName') {
+            const aName = hideOutfitName ? (a.charaName ?? a.displayName) : a.displayName;
+            const bName = hideOutfitName ? (b.charaName ?? b.displayName) : b.displayName;
+            return aName.localeCompare(bName) * dir;
+        }
         const aVal = a[sortKey] ?? 0;
         const bVal = b[sortKey] ?? 0;
         return (aVal - bVal) * dir;
@@ -143,6 +147,7 @@ function MatchupRows({
     defaultSortDir = 'desc',
     defaultOccurrenceFilter = 'gt1',
     compactColumns = false,
+    hideOutfitName = false,
     showNormalizedScore = false,
     scoreColumnLabel,
     showOccurrenceFilter = variant !== 'track',
@@ -155,6 +160,7 @@ function MatchupRows({
     defaultSortDir?: SortDir;
     defaultOccurrenceFilter?: OccurrenceFilter;
     compactColumns?: boolean;
+    hideOutfitName?: boolean;
     showNormalizedScore?: boolean;
     scoreColumnLabel?: string;
     showOccurrenceFilter?: boolean;
@@ -195,8 +201,8 @@ function MatchupRows({
         [rows, occurrenceFilter],
     );
     const sorted = useMemo(
-        () => sortEntries(filtered, sortKey, sortDir),
-        [filtered, sortKey, sortDir],
+        () => sortEntries(filtered, sortKey, sortDir, hideOutfitName),
+        [filtered, sortKey, sortDir, hideOutfitName],
     );
     const visible = sorted;
     const colorSources = useMemo(
@@ -298,7 +304,7 @@ function MatchupRows({
                                     )}
                                     <span className="bar-row-label-text">
                                         {e.cardId != null && e.cardId > 0 && e.charaName ? (
-                                            <UmaDisplayName charaName={e.charaName} cardId={e.cardId} />
+                                            <UmaDisplayName charaName={e.charaName} cardId={e.cardId} hideCardName={hideOutfitName} />
                                         ) : e.displayName}
                                     </span>
                                 </span>
@@ -328,6 +334,7 @@ export default function MatchupTable({
     defaultSortDir = 'desc',
     defaultOccurrenceFilter = 'gt1',
     compactColumns = false,
+    hideOutfitName = false,
     showNormalizedScore = false,
     scoreColumnLabel,
     showOccurrenceFilter,
@@ -340,6 +347,7 @@ export default function MatchupTable({
     defaultSortDir?: SortDir;
     defaultOccurrenceFilter?: OccurrenceFilter;
     compactColumns?: boolean;
+    hideOutfitName?: boolean;
     showNormalizedScore?: boolean;
     scoreColumnLabel?: string;
     showOccurrenceFilter?: boolean;
@@ -354,6 +362,7 @@ export default function MatchupTable({
             defaultSortDir={defaultSortDir}
             defaultOccurrenceFilter={defaultOccurrenceFilter}
             compactColumns={compactColumns}
+            hideOutfitName={hideOutfitName}
             showNormalizedScore={showNormalizedScore}
             scoreColumnLabel={scoreColumnLabel}
             showOccurrenceFilter={showOccurrenceFilter}

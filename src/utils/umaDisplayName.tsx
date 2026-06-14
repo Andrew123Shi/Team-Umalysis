@@ -1,8 +1,8 @@
 import UMDatabaseWrapper from '../data/UMDatabaseWrapper';
 
 /** Card (racewear) name + character name, matching matchup table labels. */
-export function formatUmaDisplayName(charaName: string, cardId: number): string {
-    const cardName = UMDatabaseWrapper.cards[cardId]?.name;
+export function formatUmaDisplayName(charaName: string, cardId: number, hideCardName = false): string {
+    const cardName = hideCardName ? undefined : UMDatabaseWrapper.cards[cardId]?.name;
     return cardName ? `${cardName} ${charaName}` : charaName;
 }
 
@@ -10,12 +10,14 @@ export function UmaDisplayName({
     charaName,
     cardId,
     className,
+    hideCardName = false,
 }: {
     charaName: string;
     cardId: number;
     className?: string;
+    hideCardName?: boolean;
 }) {
-    const cardName = UMDatabaseWrapper.cards[cardId]?.name;
+    const cardName = hideCardName ? undefined : UMDatabaseWrapper.cards[cardId]?.name;
     if (!cardName) {
         return <span className={className}>{charaName}</span>;
     }
