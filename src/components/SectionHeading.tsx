@@ -21,7 +21,10 @@ export default function SectionHeading({
 }: SectionHeadingProps) {
     if (level === 'card') {
         return (
-            <div className={['panel-label', className].filter(Boolean).join(' ')}>
+            <div
+                className={['panel-label', className].filter(Boolean).join(' ')}
+                title={title}
+            >
                 {title}
             </div>
         );
@@ -39,7 +42,7 @@ export default function SectionHeading({
     return (
         <div className={wrapperClass}>
             <div className="section-heading-text">
-                {headingTag === 'h4' ? <h4>{title}</h4> : <h6>{title}</h6>}
+                {headingTag === 'h4' ? <h4>{title}</h4> : <h6 title={compact ? title : undefined}>{title}</h6>}
                 {subtitle && <p className="section-kicker">{subtitle}</p>}
             </div>
             {actions}

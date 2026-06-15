@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Alert, Button, ButtonGroup, Col, Container, Form, ListGroup, Row, Spinner } from 'react-bootstrap';
 import RaceDataPresenter from '../components/RaceDataPresenter';
-import { DISTANCE_LABELS, type SessionIndexEntry } from '../analytics/types';
+import { DISTANCE_LABELS, type SessionIndexEntry, type TTRound } from '../analytics/types';
+import { getCourseDisplayName } from '../utils/course';
 import { formatScore } from '../utils/formatScore';
 import { getSessionOpponentTrainer } from '../analytics/umaIdentity';
 import { useRaceStore } from '../store/RaceStore';
@@ -25,6 +26,13 @@ function formatSessionOutcome(entry: SessionIndexEntry): string {
     const won = isSessionVictory(entry.roundsWon, entry.roundCount);
     const label = won ? 'Victory' : 'Loss';
     return `${label} ${entry.roundsWon}/${entry.roundCount} · ${formatScore(entry.totalTeamScore)} pts`;
+}
+
+function formatReplayRoundDescription(round: TTRound): string {
+    const courseId = round.courseId ?? round.parsedRace.detectedCourseId;
+    const sprint = DISTANCE_LABELS[round.distanceType] ?? round.distanceLabel ?? 'Unknown';
+    const course = getCourseDisplayName(courseId) ?? 'Unknown';
+    return `${sprint} · ${course} · Score ${formatScore(round.teamTotalScore)} · Opp. Rating ${round.opponentEvaluate.toLocaleString()}`;
 }
 
 export default function ReplayPage() {
@@ -113,7 +121,7 @@ export default function ReplayPage() {
                             <div>
                                 <h5 className="mb-0">{session.fileName}</h5>
                                 <div className="text-muted small">
-                                    {DISTANCE_LABELS[round.distanceType]} · Opp {round.opponentEvaluate.toLocaleString()} · Score {formatScore(round.teamTotalScore)}
+                                    {formatReplayRoundDescription(round)}
                                 </div>
                             </div>
                             <ButtonGroup>

@@ -140,156 +140,150 @@ export default function UmaLeaderboardSection({ sessions, scoreBonuses, onSelect
                 </ButtonGroup>
             </div>
 
-            <Row className="g-3 mb-2">
-                    <Col lg={3} md={6}>
-                        <UmaRankTable
-                            title="Top Performers by Win Rate"
-                            rows={primaryTables.topWinRate}
-                            valueColumnLabel="Win Rate"
-                            defaultSortKey="value"
-                            defaultSortDir="desc"
-                            collapsible={!rosterOnly}
-                            onSelectUma={onSelectUma}
-                        />
-                    </Col>
-                    <Col lg={3} md={6}>
-                        <UmaRankTable
-                            title="Underperformers by Win Rate"
-                            rows={primaryTables.underWinRate}
-                            valueColumnLabel="Win Rate"
-                            defaultSortKey="value"
-                            defaultSortDir="asc"
-                            collapsible={!rosterOnly}
-                            onSelectUma={onSelectUma}
-                        />
-                    </Col>
-                    <Col lg={3} md={6}>
-                        <UmaRankTable
-                            title="Top Performers by Score"
-                            rows={primaryTables.topNormScore}
-                            valueColumnLabel="Score"
-                            defaultSortKey="value"
-                            defaultSortDir="desc"
-                            collapsible={!rosterOnly}
-                            onSelectUma={onSelectUma}
-                        />
-                    </Col>
-                    <Col lg={3} md={6}>
-                        <UmaRankTable
-                            title="Underperformers by Score"
-                            rows={primaryTables.underNormScore}
-                            valueColumnLabel="Score"
-                            defaultSortKey="value"
-                            defaultSortDir="asc"
-                            collapsible={!rosterOnly}
-                            onSelectUma={onSelectUma}
-                        />
-                    </Col>
-                </Row>
-
-                <Row className="g-3 mb-2">
-                    <Col lg={3} md={6}>
-                        <UmaRankTable
-                            title="Top Average Win Margins"
-                            rows={metricTables.winMargin}
-                            valueColumnLabel="Average Margin"
-                            defaultSortKey="value"
-                            defaultSortDir="desc"
-                            collapsible={!rosterOnly}
-                            onSelectUma={onSelectUma}
-                        />
-                    </Col>
-                    <Col lg={3} md={6}>
-                        <UmaRankTable
-                            title="Top % of Strong Starts"
-                            rows={metricTables.strongStart}
-                            valueColumnLabel="Rate"
-                            defaultSortKey="value"
-                            defaultSortDir="desc"
-                            collapsible={!rosterOnly}
-                            onSelectUma={onSelectUma}
-                        />
-                    </Col>
-                    <Col lg={3} md={6}>
-                        <UmaRankTable
-                            title="Top Good Mid-Race Positioning"
-                            rows={metricTables.goodMid}
-                            valueColumnLabel="Rate"
-                            defaultSortKey="value"
-                            defaultSortDir="desc"
-                            collapsible={!rosterOnly}
-                            onSelectUma={onSelectUma}
-                        />
-                    </Col>
-                    <Col lg={3} md={6}>
-                        <UmaRankTable
-                            title="Top Good Late-Race Positioning"
-                            rows={metricTables.goodLate}
-                            valueColumnLabel="Rate"
-                            defaultSortKey="value"
-                            defaultSortDir="desc"
-                            collapsible={!rosterOnly}
-                            onSelectUma={onSelectUma}
-                        />
-                    </Col>
-                </Row>
-
-                <Row className="g-3">
-                    <Col lg={3} md={6}>
-                        <UmaRankTable
-                            title="Top Unique Skill Activations"
-                            rows={metricTables.uniqueSkills}
-                            valueColumnLabel="Rate"
-                            defaultSortKey="value"
-                            defaultSortDir="desc"
-                            collapsible={!rosterOnly}
-                            onSelectUma={onSelectUma}
-                        />
-                    </Col>
-                    <Col lg={3} md={6}>
-                        <UmaRankTable
-                            title="Top Gold Skill Activations"
-                            rows={metricTables.goldSkills}
-                            valueColumnLabel="Average"
-                            defaultSortKey="value"
-                            defaultSortDir="desc"
-                            collapsible={!rosterOnly}
-                            onSelectUma={onSelectUma}
-                        />
-                    </Col>
-                    <Col lg={3} md={6}>
-                        <UmaRankTable
-                            title="Top Regular Skill Activations"
-                            rows={metricTables.regSkills}
-                            valueColumnLabel="Average"
-                            defaultSortKey="value"
-                            defaultSortDir="desc"
-                            collapsible={!rosterOnly}
-                            onSelectUma={onSelectUma}
-                        />
-                    </Col>
-                    <Col lg={3} md={6}>
-                        <UmaRankTable
-                            title="Top Target Time Beaters"
-                            rows={metricTables.beatTarget}
-                            valueColumnLabel="Rate"
-                            defaultSortKey="value"
-                            defaultSortDir="desc"
-                            collapsible={!rosterOnly}
-                            onSelectUma={onSelectUma}
-                        />
-                    </Col>
-                    <Col lg={3} md={6}>
-                        <UmaRankTable
-                            title="Least Rushed Occurrence"
-                            rows={metricTables.leastRushed}
-                            valueColumnLabel="Rate"
-                            defaultSortKey="value"
-                            defaultSortDir="asc"
-                            collapsible={!rosterOnly}
-                            onSelectUma={onSelectUma}
-                        />
-                    </Col>
+            <Row className="g-3">
+                <Col lg={3} md={6}>
+                    <UmaRankTable
+                        title="Top Performers by Win Rate"
+                        rows={primaryTables.topWinRate}
+                        valueColumnLabel="Win Rate"
+                        defaultSortKey="value"
+                        defaultSortDir="desc"
+                        collapsible={!rosterOnly}
+                        onSelectUma={onSelectUma}
+                    />
+                </Col>
+                <Col lg={3} md={6}>
+                    <UmaRankTable
+                        title="Underperformers by Win Rate"
+                        rows={primaryTables.underWinRate}
+                        valueColumnLabel="Win Rate"
+                        defaultSortKey="value"
+                        defaultSortDir="asc"
+                        collapsible={!rosterOnly}
+                        onSelectUma={onSelectUma}
+                    />
+                </Col>
+                <Col lg={3} md={6}>
+                    <UmaRankTable
+                        title="Top Performers by Score"
+                        rows={primaryTables.topNormScore}
+                        valueColumnLabel="Score"
+                        defaultSortKey="value"
+                        defaultSortDir="desc"
+                        collapsible={!rosterOnly}
+                        onSelectUma={onSelectUma}
+                    />
+                </Col>
+                <Col lg={3} md={6}>
+                    <UmaRankTable
+                        title="Underperformers by Score"
+                        rows={primaryTables.underNormScore}
+                        valueColumnLabel="Score"
+                        defaultSortKey="value"
+                        defaultSortDir="asc"
+                        collapsible={!rosterOnly}
+                        onSelectUma={onSelectUma}
+                    />
+                </Col>
+                <Col lg={3} md={6}>
+                    <UmaRankTable
+                        title="Top Average Win Margins"
+                        rows={metricTables.winMargin}
+                        valueColumnLabel="Average Margin"
+                        defaultSortKey="value"
+                        defaultSortDir="desc"
+                        collapsible={!rosterOnly}
+                        onSelectUma={onSelectUma}
+                    />
+                </Col>
+                <Col lg={3} md={6}>
+                    <UmaRankTable
+                        title="Top % of Strong Starts"
+                        rows={metricTables.strongStart}
+                        valueColumnLabel="Rate"
+                        defaultSortKey="value"
+                        defaultSortDir="desc"
+                        collapsible={!rosterOnly}
+                        onSelectUma={onSelectUma}
+                    />
+                </Col>
+                <Col lg={3} md={6}>
+                    <UmaRankTable
+                        title="Top Good Mid-Race Positioning"
+                        rows={metricTables.goodMid}
+                        valueColumnLabel="Rate"
+                        defaultSortKey="value"
+                        defaultSortDir="desc"
+                        collapsible={!rosterOnly}
+                        onSelectUma={onSelectUma}
+                    />
+                </Col>
+                <Col lg={3} md={6}>
+                    <UmaRankTable
+                        title="Top Good Late-Race Positioning"
+                        rows={metricTables.goodLate}
+                        valueColumnLabel="Rate"
+                        defaultSortKey="value"
+                        defaultSortDir="desc"
+                        collapsible={!rosterOnly}
+                        onSelectUma={onSelectUma}
+                    />
+                </Col>
+                <Col lg={3} md={6}>
+                    <UmaRankTable
+                        title="Top Unique Skill Activations"
+                        rows={metricTables.uniqueSkills}
+                        valueColumnLabel="Rate"
+                        defaultSortKey="value"
+                        defaultSortDir="desc"
+                        collapsible={!rosterOnly}
+                        onSelectUma={onSelectUma}
+                    />
+                </Col>
+                <Col lg={3} md={6}>
+                    <UmaRankTable
+                        title="Top Gold Skill Activations"
+                        rows={metricTables.goldSkills}
+                        valueColumnLabel="Average"
+                        defaultSortKey="value"
+                        defaultSortDir="desc"
+                        collapsible={!rosterOnly}
+                        onSelectUma={onSelectUma}
+                    />
+                </Col>
+                <Col lg={3} md={6}>
+                    <UmaRankTable
+                        title="Top Regular Skill Activations"
+                        rows={metricTables.regSkills}
+                        valueColumnLabel="Average"
+                        defaultSortKey="value"
+                        defaultSortDir="desc"
+                        collapsible={!rosterOnly}
+                        onSelectUma={onSelectUma}
+                    />
+                </Col>
+                <Col lg={3} md={6}>
+                    <UmaRankTable
+                        title="Top Target Time Beaters"
+                        rows={metricTables.beatTarget}
+                        valueColumnLabel="Rate"
+                        defaultSortKey="value"
+                        defaultSortDir="desc"
+                        collapsible={!rosterOnly}
+                        onSelectUma={onSelectUma}
+                    />
+                </Col>
+                <Col lg={3} md={6}>
+                    <UmaRankTable
+                        title="Least Rushed Occurrence"
+                        rows={metricTables.leastRushed}
+                        valueColumnLabel="Rate"
+                        defaultSortKey="value"
+                        defaultSortDir="asc"
+                        collapsible={!rosterOnly}
+                        onSelectUma={onSelectUma}
+                    />
+                </Col>
             </Row>
         </section>
     );

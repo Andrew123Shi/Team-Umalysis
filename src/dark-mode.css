@@ -2062,6 +2062,25 @@ body {
 
 .section-heading.is-panel.is-compact {
   padding-bottom: 0.9rem;
+  min-width: 0;
+  max-width: 100%;
+  flex: 0 0 auto;
+  width: 100%;
+}
+
+.section-heading.is-panel.is-compact::before {
+  align-self: center;
+}
+
+.section-heading.is-panel.is-compact h6 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.d-flex:not(.flex-column) > .section-heading.is-panel.is-compact {
+  flex: 1 1 0;
+  width: auto;
 }
 
 .section-heading.is-panel.is-compact.is-tight-below {
@@ -2135,6 +2154,9 @@ body {
   font-weight: 600;
   letter-spacing: 0.02em;
   margin: 0 0 0.35rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .analytics-section {
@@ -2160,6 +2182,10 @@ body {
 }
 
 .distance-section .app-card.mb-4 {
+  margin-bottom: 0 !important;
+}
+
+.analytics-section .row.g-3 .app-card.mb-4 {
   margin-bottom: 0 !important;
 }
 
