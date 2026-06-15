@@ -7,7 +7,10 @@ import UMDatabaseWrapper from './data/UMDatabaseWrapper';
 import GameDataLoader from './data/GameDataLoader';
 import { useStickyOffset } from './hooks/useStickyOffset';
 import AppFooter from './components/AppFooter';
-import DashboardPage from './pages/DashboardPage';
+import DashboardLayout from './pages/dashboard/DashboardLayout';
+import DistanceAnalysisPage from './pages/dashboard/DistanceAnalysisPage';
+import OverviewPage from './pages/dashboard/OverviewPage';
+import UmaAnalysisPage from './pages/dashboard/UmaAnalysisPage';
 import ReplayPage from './pages/ReplayPage';
 import SettingsPage from './pages/SettingsPage';
 import { RaceStoreProvider, useRaceStore } from './store/RaceStore';
@@ -39,7 +42,9 @@ function AppHeader() {
                     <Navbar.Toggle aria-controls="nav" />
                     <Navbar.Collapse id="nav">
                         <Nav className="me-auto">
-                            <Nav.Link as={NavLink} to="/" end>Dashboard</Nav.Link>
+                            <Nav.Link as={NavLink} to="/" end>Overview</Nav.Link>
+                            <Nav.Link as={NavLink} to="/uma">Uma Analysis</Nav.Link>
+                            <Nav.Link as={NavLink} to="/distance">Distance Analysis</Nav.Link>
                             <Nav.Link as={NavLink} to="/replay">Replay</Nav.Link>
                             <Nav.Link as={NavLink} to="/settings">Settings</Nav.Link>
                         </Nav>
@@ -67,7 +72,12 @@ function AppHeader() {
 function AppRoutes() {
     return (
         <Routes>
-            <Route path="/" element={<DashboardPage />} />
+            <Route path="/" element={<DashboardLayout />}>
+                <Route index element={<OverviewPage />} />
+                <Route path="uma" element={<UmaAnalysisPage />} />
+                <Route path="uma/:buildKey" element={<UmaAnalysisPage />} />
+                <Route path="distance" element={<DistanceAnalysisPage />} />
+            </Route>
             <Route path="/replay" element={<ReplayPage />} />
             <Route path="/settings" element={<SettingsPage />} />
         </Routes>

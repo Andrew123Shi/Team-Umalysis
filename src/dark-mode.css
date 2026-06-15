@@ -1145,6 +1145,25 @@ body {
   min-height: 1.6rem;
 }
 
+.overview-win-rate-card .win-rate-legend {
+  flex-wrap: nowrap;
+  width: 100%;
+  gap: 0.35rem 0.55rem;
+}
+
+.overview-win-rate-card .win-rate-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+
+.overview-win-rate-card .win-rate-legend-item strong {
+  display: inline-block;
+  width: 6ch;
+  text-align: left;
+}
+
 .overview-score-card .card-body {
   display: flex;
   flex-direction: column;
@@ -1659,8 +1678,7 @@ body {
 
 :root {
   --sticky-app-header-height: 56px;
-  --sticky-dashboard-tabs-height: 44px;
-  --sticky-subnav-offset: calc(var(--sticky-app-header-height) + var(--sticky-dashboard-tabs-height));
+  --sticky-subnav-offset: var(--sticky-app-header-height);
 }
 
 .app-fixed-header {
@@ -1681,26 +1699,6 @@ body {
   padding-top: var(--sticky-app-header-height);
   padding-right: 10vw;
   padding-left: 10vw;
-}
-
-.dashboard-fixed-tabs {
-  position: fixed;
-  top: var(--sticky-app-header-height);
-  left: 0;
-  right: 0;
-  z-index: 1020;
-  background-color: var(--app-bg-0);
-  padding-left: calc(var(--bs-gutter-x, 1.5rem) * 0.5);
-  padding-right: calc(var(--bs-gutter-x, 1.5rem) * 0.5);
-  padding-bottom: 0.75rem;
-}
-
-.dashboard-fixed-tabs .nav-tabs {
-  margin-bottom: 0;
-}
-
-.dashboard-tab-content {
-  padding-top: var(--sticky-dashboard-tabs-height);
 }
 
 .dashboard-loading-alert {
@@ -2226,38 +2224,6 @@ body {
 .metric-card.accent-purple { --metric-accent: var(--app-accent-3); }
 .metric-card.accent-gold { --metric-accent: var(--app-accent-4); }
 .metric-card.accent-red { --metric-accent: var(--app-danger); }
-
-.dashboard-fixed-tabs {
-  background: rgba(9, 13, 20, 0.84);
-  backdrop-filter: blur(14px);
-  border-bottom: 1px solid var(--app-border);
-  padding-top: 0.7rem;
-}
-
-.dashboard-fixed-tabs .nav-tabs {
-  border: 0;
-  gap: 0.45rem;
-}
-
-.dashboard-fixed-tabs .nav-tabs .nav-link {
-  border: 1px solid var(--app-border);
-  border-radius: 999px;
-  background: var(--app-surface-1);
-  color: var(--app-text-secondary);
-  font-weight: 700;
-}
-
-.dashboard-fixed-tabs .nav-tabs .nav-link:hover {
-  color: var(--app-text-primary);
-  background: var(--app-surface-3);
-  border-color: var(--app-border-strong);
-}
-
-.dashboard-fixed-tabs .nav-tabs .nav-link.active {
-  color: var(--app-accent);
-  background: rgba(100, 181, 246, 0.15);
-  border-color: rgba(100, 181, 246, 0.45);
-}
 
 .table,
 .table-dark {
