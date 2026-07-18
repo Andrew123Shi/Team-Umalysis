@@ -17,7 +17,7 @@ const SKILL_ICON_FOLDER_BY_ID: Record<number, SkillIconFolder> = {
     10011: 'Green', 10012: 'Green', 10013: 'Green', 10021: 'Green', 10022: 'Green', 10023: 'Green',
     10031: 'Green', 10032: 'Green', 10033: 'Green', 10041: 'Green', 10042: 'Green', 10043: 'Green',
     10051: 'Green', 10052: 'Green', 10053: 'Green', 10061: 'Green', 10062: 'Green', 10063: 'Green',
-    40012: 'Green',
+    20181: 'Green', 40012: 'Green',
     30013: 'Grey', 30023: 'Grey', 30033: 'Grey', 30043: 'Grey',
     10014: 'Purple', 10024: 'Purple', 10034: 'Purple', 10044: 'Purple', 10054: 'Purple',
     20014: 'Purple', 20024: 'Purple', 20034: 'Purple', 20044: 'Purple', 20064: 'Purple', 20094: 'Purple',
@@ -30,6 +30,7 @@ const SKILL_ICON_FOLDER_BY_ID: Record<number, SkillIconFolder> = {
     20073: 'Yellow', 20081: 'Yellow', 20082: 'Yellow', 20083: 'Yellow', 20091: 'Yellow', 20092: 'Yellow',
     20101: 'Yellow', 20102: 'Yellow', 20121: 'Yellow', 20122: 'Yellow', 20131: 'Yellow', 20132: 'Yellow',
     20141: 'Yellow', 20142: 'Yellow',
+    20161: 'Yellow', 20171: 'Yellow',
     2010010: 'Yellow',
 };
 
