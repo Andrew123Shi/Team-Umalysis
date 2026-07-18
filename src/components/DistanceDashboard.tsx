@@ -19,9 +19,11 @@ function buildScopeState(scope: StatsScope): DistanceScopeState {
 const DistanceSection = memo(function DistanceSection({
     distanceType,
     stats,
+    emaSourceTrend,
 }: {
     distanceType: number;
     stats: AggregatedStats;
+    emaSourceTrend?: AggregatedStats['scoreTrend'];
 }) {
     return (
         <section
@@ -30,7 +32,12 @@ const DistanceSection = memo(function DistanceSection({
             style={{ scrollMarginTop: 'var(--sticky-subnav-offset)' }}
         >
             <SectionHeading level="section" title={DISTANCE_LABELS[distanceType]} />
-            <StatsPanels stats={stats} viewMode="distance" showDistanceWinRates={false} />
+            <StatsPanels
+                stats={stats}
+                emaSourceTrend={emaSourceTrend}
+                viewMode="distance"
+                showDistanceWinRates={false}
+            />
         </section>
     );
 });
@@ -94,15 +101,19 @@ export default function DistanceDashboard({ distanceStats, recentDistanceStats }
             <Col lg={10}>
                 {DISTANCE_ORDER.map((distanceType) => {
                     const displayedScope = displayedScopes[distanceType] ?? scope;
+                    const fullStats = distanceStats.get(distanceType);
                     const stats = displayedScope === 'recent'
-                        ? (recentDistanceStats.get(distanceType) ?? distanceStats.get(distanceType))
-                        : distanceStats.get(distanceType);
+                        ? (recentDistanceStats.get(distanceType) ?? fullStats)
+                        : fullStats;
                     if (!stats) return null;
                     return (
                         <DistanceSection
                             key={distanceType}
                             distanceType={distanceType}
                             stats={stats}
+                            emaSourceTrend={
+                                displayedScope === 'recent' ? fullStats?.scoreTrend : undefined
+                            }
                         />
                     );
                 })}

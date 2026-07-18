@@ -4,6 +4,8 @@ import { Form } from 'react-bootstrap';
 import type { AggregatedStats, RosterUpdate } from '../../analytics/types';
 import { collectAllAxisValues, collectVisibleAxisValues, isLegendSeriesVisible, type LegendSelectChangedEvent } from './chartLegendScale';
 import { formatScore } from '../../utils/formatScore';
+import { emaForVisibleWindow } from '../../utils/ema';
+import { segmentAverage } from '../../utils/segmentAverage';
 import { formatUmaDisplayName } from '../../utils/umaDisplayName';
 import { formatRatingHtml } from '../RatingDisplay';
 import { chartTooltipStyle } from './chartTooltip';
@@ -17,6 +19,7 @@ const RIGHT_Y_AXIS_NAME_GAP = 36;
 const GRID_SPLIT_NUMBER = 5;
 const SOTR_LABEL = 'Score / Team Rating (SOTR)';
 const OWN_TEAM_RATING_LABEL = 'Own Team Rating';
+const SEGMENT_AVG_LABEL = 'Roster Average';
 
 function sotrEmaLabel(period: number): string {
     return `SOTR EMA ${Math.max(1, Math.floor(period))}`;
@@ -25,22 +28,6 @@ function sotrEmaLabel(period: number): string {
 function bonusMultiplier(rawBonus: number): number {
     const pct = rawBonus / 100;
     return pct > 0 ? 1 + pct / 100 : 1;
-}
-
-function ema(values: number[], period: number): (number | null)[] {
-    const n = Math.max(1, Math.floor(period));
-    const result: (number | null)[] = values.map(() => null);
-    if (values.length < n) return result;
-
-    let emaVal = values.slice(0, n).reduce((sum, v) => sum + v, 0) / n;
-    result[n - 1] = emaVal;
-    const k = 2 / (n + 1);
-
-    for (let i = n; i < values.length; i++) {
-        emaVal = values[i] * k + emaVal * (1 - k);
-        result[i] = emaVal;
-    }
-    return result;
 }
 
 function snapRatingYRange(...series: number[][]): { min: number; max: number } {
@@ -106,7 +93,9 @@ function buildTooltipFormatter(scoreTrend: AggregatedStats['scoreTrend'], emaLab
         const lines = items.map((item) => {
             const val = item.value;
             if (val == null || !Number.isFinite(val)) return '';
-            const isRatioSeries = item.seriesName === SOTR_LABEL || item.seriesName === emaLabel;
+            const isRatioSeries = item.seriesName === SOTR_LABEL
+                || item.seriesName === emaLabel
+                || item.seriesName === SEGMENT_AVG_LABEL;
             const formatted = isRatioSeries ? val.toFixed(3) : formatScore(val);
             return `${item.marker ?? ''}${item.seriesName ?? ''}: ${formatted}`;
         }).filter(Boolean);
@@ -169,7 +158,20 @@ function buildRosterMarkLine(
     };
 }
 
-export default function TeamRatingTrendChart({ stats }: { stats: AggregatedStats }) {
+function sotrRatio(point: AggregatedStats['scoreTrend'][number]): number | null {
+    if (point.selfTeamRating <= 0) return null;
+    const normalizedScore = point.teamScore / bonusMultiplier(point.supportCardBonus);
+    return normalizedScore / point.selfTeamRating;
+}
+
+export default function TeamRatingTrendChart({
+    stats,
+    emaSourceTrend,
+}: {
+    stats: AggregatedStats;
+    /** Full-history trend used to warm-start EMA when `stats` is a Recent window. */
+    emaSourceTrend?: AggregatedStats['scoreTrend'];
+}) {
     const [emaPeriod, setEmaPeriod] = useState(50);
     const [legendSelected, setLegendSelected] = useState<Record<string, boolean>>({});
     const scoreTrend = stats.scoreTrend;
@@ -177,16 +179,37 @@ export default function TeamRatingTrendChart({ stats }: { stats: AggregatedStats
 
     const dates = scoreTrend.map((d) => d.date);
     const formattedDates = useMemo(() => dates.map(formatChartDate), [dates]);
+    const trendKeys = useMemo(() => scoreTrend.map((d) => d.fileName), [scoreTrend]);
     const selfRatings = scoreTrend.map((d) => d.selfTeamRating);
     const opponentRatings = scoreTrend.map((d) => d.opponentTeamRating);
-    const scoreToRatingRatios = scoreTrend.map((d) => {
-        if (d.selfTeamRating <= 0) return null;
-        const normalizedScore = d.teamScore / bonusMultiplier(d.supportCardBonus);
-        return normalizedScore / d.selfTeamRating;
-    });
+    const scoreToRatingRatios = scoreTrend.map(sotrRatio);
+    const sourceKeys = useMemo(
+        () => emaSourceTrend?.map((d) => d.fileName),
+        [emaSourceTrend],
+    );
+    const sourceRatios = useMemo(
+        () => emaSourceTrend?.map((d) => sotrRatio(d) ?? 0),
+        [emaSourceTrend],
+    );
     const scoreRatioEma = useMemo(
-        () => ema(scoreToRatingRatios.map((r) => r ?? 0), emaPeriod),
-        [scoreToRatingRatios, emaPeriod],
+        () => emaForVisibleWindow(
+            scoreToRatingRatios.map((r) => r ?? 0),
+            trendKeys,
+            sourceRatios,
+            sourceKeys,
+            emaPeriod,
+        ),
+        [scoreToRatingRatios, trendKeys, sourceRatios, sourceKeys, emaPeriod],
+    );
+    const rosterBoundaryIndices = useMemo(
+        () => scoreTrend
+            .map((point, index) => (point.rosterUpdate ? index : -1))
+            .filter((index) => index >= 0),
+        [scoreTrend],
+    );
+    const scoreRatioSegmentAvg = useMemo(
+        () => segmentAverage(scoreToRatingRatios, rosterBoundaryIndices),
+        [scoreToRatingRatios, rosterBoundaryIndices],
     );
     const emaLabel = sotrEmaLabel(emaPeriod);
 
@@ -195,7 +218,8 @@ export default function TeamRatingTrendChart({ stats }: { stats: AggregatedStats
         { name: 'Opponent Team Rating', yAxisIndex: 0, data: opponentRatings },
         { name: SOTR_LABEL, yAxisIndex: 1, data: scoreToRatingRatios },
         { name: emaLabel, yAxisIndex: 1, data: scoreRatioEma },
-    ], [selfRatings, opponentRatings, scoreToRatingRatios, scoreRatioEma, emaLabel]);
+        { name: SEGMENT_AVG_LABEL, yAxisIndex: 1, data: scoreRatioSegmentAvg },
+    ], [selfRatings, opponentRatings, scoreToRatingRatios, scoreRatioEma, scoreRatioSegmentAvg, emaLabel]);
 
     useEffect(() => {
         setLegendSelected({});
@@ -221,7 +245,8 @@ export default function TeamRatingTrendChart({ stats }: { stats: AggregatedStats
 
     const sotrAxisVisible = useMemo(
         () => isLegendSeriesVisible(legendSelected, SOTR_LABEL)
-            || isLegendSeriesVisible(legendSelected, emaLabel),
+            || isLegendSeriesVisible(legendSelected, emaLabel)
+            || isLegendSeriesVisible(legendSelected, SEGMENT_AVG_LABEL),
         [legendSelected, emaLabel],
     );
 
@@ -252,7 +277,7 @@ export default function TeamRatingTrendChart({ stats }: { stats: AggregatedStats
             0,
             0,
         );
-        const legendData = [OWN_TEAM_RATING_LABEL, 'Opponent Team Rating', SOTR_LABEL, emaLabel];
+        const legendData = [OWN_TEAM_RATING_LABEL, 'Opponent Team Rating', SOTR_LABEL, emaLabel, SEGMENT_AVG_LABEL];
 
         return {
             backgroundColor: 'transparent',
@@ -385,7 +410,7 @@ export default function TeamRatingTrendChart({ stats }: { stats: AggregatedStats
                     smooth: true,
                     showSymbol: false,
                     itemStyle: { color: '#75b798' },
-                    lineStyle: { width: 1.5, type: 'dotted' },
+                    lineStyle: { width: 1, type: 'solid' },
                     z: 1,
                 },
                 {
@@ -398,6 +423,17 @@ export default function TeamRatingTrendChart({ stats }: { stats: AggregatedStats
                     itemStyle: { color: '#ffc107' },
                     lineStyle: { width: 2, type: 'dashed' },
                     z: 4,
+                },
+                {
+                    name: SEGMENT_AVG_LABEL,
+                    type: 'line',
+                    yAxisIndex: 1,
+                    data: scoreRatioSegmentAvg,
+                    step: 'end',
+                    showSymbol: false,
+                    itemStyle: { color: '#ffffff' },
+                    lineStyle: { width: 2, type: 'dashed' },
+                    z: 5,
                 },
                 ...(rosterMarkerSeries ? [rosterMarkerSeries] : []),
             ],
@@ -412,6 +448,7 @@ export default function TeamRatingTrendChart({ stats }: { stats: AggregatedStats
         scoreTrend,
         scoreToRatingRatios,
         scoreRatioEma,
+        scoreRatioSegmentAvg,
         selfRatings,
         opponentRatings,
         legendSelected,

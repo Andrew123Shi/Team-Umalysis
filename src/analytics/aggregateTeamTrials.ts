@@ -519,6 +519,28 @@ function rosterUpdateForUmaView(update: RosterUpdate | undefined, buildKey: stri
     return update;
 }
 
+/** Outcome for one scoreTrend point — matches sessionWins / placement win rules. */
+function trendPointWon(
+    session: TTSession,
+    options?: { buildKey?: string; distanceType?: number },
+    umaFinishOrder?: number,
+): boolean {
+    if (options?.buildKey !== undefined) {
+        return umaFinishOrder === 1;
+    }
+    if (options?.distanceType !== undefined) {
+        const round = session.rounds.find((r) => r.distanceType === options.distanceType);
+        return round?.playerWonRound ?? false;
+    }
+    const teamRoundWins = session.rounds.filter((r) => r.playerWonRound).length;
+    return teamRoundWins >= 3;
+}
+
+function sessionRaceWinRate(session: TTSession): number {
+    if (session.rounds.length === 0) return 0;
+    return session.rounds.filter((r) => r.playerWonRound).length / session.rounds.length;
+}
+
 function diffRoster(prev: Map<string, RosterChangeUma>, curr: Map<string, RosterChangeUma>): RosterUpdate | undefined {
     const added: RosterChangeUma[] = [];
     const removed: RosterChangeUma[] = [];
@@ -798,6 +820,7 @@ export function aggregateStats(
                                 supportCardBonus: s.supportCardBonus,
                                 selfTeamRating: teamRatings.selfTeamRating,
                                 opponentTeamRating: teamRatings.opponentTeamRating,
+                                won: trendPointWon(s, options, uma.finishOrder),
                                 ...(rosterUpdate ? { rosterUpdate } : {}),
                             }];
                         }
@@ -805,6 +828,8 @@ export function aggregateStats(
                     return [];
                 }
                 if (!teamRatings) return [];
+                const isTeamOverview = options?.buildKey === undefined
+                    && options?.distanceType === undefined;
                 return [{
                     date: s.savedAt!.toISOString().slice(0, 10),
                     fileName: s.fileName,
@@ -812,6 +837,8 @@ export function aggregateStats(
                     supportCardBonus: s.supportCardBonus,
                     selfTeamRating: teamRatings.selfTeamRating,
                     opponentTeamRating: teamRatings.opponentTeamRating,
+                    won: trendPointWon(s, options),
+                    ...(isTeamOverview ? { raceWinRate: sessionRaceWinRate(s) } : {}),
                     ...(rosterUpdate ? { rosterUpdate } : {}),
                 }];
             }),

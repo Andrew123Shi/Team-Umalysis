@@ -2103,6 +2103,53 @@ body {
   padding-bottom: 0.35rem;
 }
 
+.win-rate-trend-chart-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  margin-bottom: 0.15rem;
+}
+
+.win-rate-trend-full-scale-row {
+  position: relative;
+  width: 82px;
+  height: 1.1rem;
+  flex-shrink: 0;
+}
+
+.win-rate-trend-full-scale-check {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(calc(-50% + 10px));
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.win-rate-trend-full-scale-check .form-check-input {
+  width: 0.9rem;
+  height: 0.9rem;
+  margin: 0;
+  padding: 0;
+  flex-shrink: 0;
+  vertical-align: middle;
+  cursor: pointer;
+}
+
+.win-rate-trend-full-scale-check span {
+  font-size: 0.72rem;
+  line-height: 1;
+  color: rgba(206, 212, 218, 0.72);
+  user-select: none;
+}
+
 .section-heading.has-actions {
   justify-content: space-between;
   flex-wrap: wrap;

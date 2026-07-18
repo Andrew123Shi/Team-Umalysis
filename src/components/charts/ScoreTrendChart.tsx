@@ -5,6 +5,8 @@ import type { AggregatedStats, RosterChangeUma, RosterUpdate } from '../../analy
 import type { StatCardViewMode } from './StatCards';
 import { type LegendSelectChangedEvent } from './chartLegendScale';
 import { formatScore } from '../../utils/formatScore';
+import { emaForVisibleWindow } from '../../utils/ema';
+import { segmentAverage } from '../../utils/segmentAverage';
 import { formatUmaDisplayName } from '../../utils/umaDisplayName';
 import { formatRatingHtml } from '../RatingDisplay';
 import { chartTooltipStyle } from './chartTooltip';
@@ -14,12 +16,14 @@ import { useRaceStore } from '../../store/RaceStore';
 
 type ScoreMode = 'normalized' | 'raw';
 
-type ScoreLegendKey = 'score' | 'ema' | 'bonus';
+type ScoreLegendKey = 'score' | 'ema' | 'segmentAvg' | 'bonus';
 type ScoreLegendSelection = Partial<Record<ScoreLegendKey, boolean>>;
 
 function isScoreLegendVisible(selected: ScoreLegendSelection, key: ScoreLegendKey): boolean {
     return selected[key] !== false;
 }
+
+const SEGMENT_AVG_LABEL = 'Roster Average';
 
 function toEchartsLegendSelected(
     selected: ScoreLegendSelection,
@@ -30,6 +34,7 @@ function toEchartsLegendSelected(
     return {
         [scoreName]: isScoreLegendVisible(selected, 'score'),
         [emaLabel]: isScoreLegendVisible(selected, 'ema'),
+        [SEGMENT_AVG_LABEL]: isScoreLegendVisible(selected, 'segmentAvg'),
         ...(showBonusChart ? { 'Support Bonus': isScoreLegendVisible(selected, 'bonus') } : {}),
     };
 }
@@ -43,6 +48,7 @@ function fromEchartsLegendSelected(
     return {
         score: selected[scoreName],
         ema: selected[emaLabel],
+        segmentAvg: selected[SEGMENT_AVG_LABEL],
         ...(showBonusChart ? { bonus: selected['Support Bonus'] } : {}),
     };
 }
@@ -54,22 +60,6 @@ function bonusPercent(rawBonus: number): number {
 function bonusMultiplier(rawBonus: number): number {
     const pct = bonusPercent(rawBonus);
     return pct > 0 ? 1 + pct / 100 : 1;
-}
-
-function ema(values: number[], period: number): (number | null)[] {
-    const n = Math.max(1, Math.floor(period));
-    const result: (number | null)[] = values.map(() => null);
-    if (values.length < n) return result;
-
-    let emaVal = values.slice(0, n).reduce((sum, v) => sum + v, 0) / n;
-    result[n - 1] = emaVal;
-    const k = 2 / (n + 1);
-
-    for (let i = n; i < values.length; i++) {
-        emaVal = values[i] * k + emaVal * (1 - k);
-        result[i] = emaVal;
-    }
-    return result;
 }
 
 const SCORE_Y_STEP = 10_000;
@@ -209,9 +199,12 @@ function buildRosterMarkLine(
 
 export default function ScoreTrendChart({
     stats,
+    emaSourceTrend,
     viewMode = 'team',
 }: {
     stats: AggregatedStats;
+    /** Full-history trend used to warm-start EMA when `stats` is a Recent window. */
+    emaSourceTrend?: AggregatedStats['scoreTrend'];
     viewMode?: StatCardViewMode;
 }) {
     const { debugMode } = useRaceStore();
@@ -221,12 +214,32 @@ export default function ScoreTrendChart({
 
     const dates = stats.scoreTrend.map((d) => d.date);
     const formattedDates = useMemo(() => dates.map(formatChartDate), [dates]);
+    const trendKeys = useMemo(() => stats.scoreTrend.map((d) => d.fileName), [stats.scoreTrend]);
     const rawScores = stats.scoreTrend.map((d) => d.teamScore);
     const normalizedScores = stats.scoreTrend.map((d) => d.teamScore / bonusMultiplier(d.supportCardBonus));
     const bonusValues = stats.scoreTrend.map((d) => bonusPercent(d.supportCardBonus));
 
-    const rawEma = useMemo(() => ema(rawScores, emaPeriod), [rawScores, emaPeriod]);
-    const normalizedEma = useMemo(() => ema(normalizedScores, emaPeriod), [normalizedScores, emaPeriod]);
+    const sourceKeys = useMemo(
+        () => emaSourceTrend?.map((d) => d.fileName),
+        [emaSourceTrend],
+    );
+    const sourceRawScores = useMemo(
+        () => emaSourceTrend?.map((d) => d.teamScore),
+        [emaSourceTrend],
+    );
+    const sourceNormalizedScores = useMemo(
+        () => emaSourceTrend?.map((d) => d.teamScore / bonusMultiplier(d.supportCardBonus)),
+        [emaSourceTrend],
+    );
+
+    const rawEma = useMemo(
+        () => emaForVisibleWindow(rawScores, trendKeys, sourceRawScores, sourceKeys, emaPeriod),
+        [rawScores, trendKeys, sourceRawScores, sourceKeys, emaPeriod],
+    );
+    const normalizedEma = useMemo(
+        () => emaForVisibleWindow(normalizedScores, trendKeys, sourceNormalizedScores, sourceKeys, emaPeriod),
+        [normalizedScores, trendKeys, sourceNormalizedScores, sourceKeys, emaPeriod],
+    );
 
     const isDistanceView = viewMode === 'distance';
     const isUmaView = viewMode === 'uma';
@@ -237,6 +250,10 @@ export default function ScoreTrendChart({
             .filter((line): line is { xAxis: number } => line !== null),
         [stats.scoreTrend],
     );
+    const rosterBoundaryIndices = useMemo(
+        () => rosterUpdateMarkLines.map((line) => line.xAxis),
+        [rosterUpdateMarkLines],
+    );
 
     const activeScores = isScopedScoreView
         ? rawScores
@@ -244,6 +261,10 @@ export default function ScoreTrendChart({
     const activeEma = isScopedScoreView
         ? rawEma
         : (mode === 'normalized' ? normalizedEma : rawEma);
+    const activeSegmentAvg = useMemo(
+        () => segmentAverage(activeScores, rosterBoundaryIndices),
+        [activeScores, rosterBoundaryIndices],
+    );
 
     const dateInterval = dates.length > 12 ? Math.ceil(dates.length / 8) - 1 : 0;
     const emaLabel = `EMA ${Math.max(1, Math.floor(emaPeriod))}`;
@@ -268,26 +289,28 @@ export default function ScoreTrendChart({
     const scoreYRange = useMemo(() => {
         const scoreLineVisible = isScoreLegendVisible(legendSelected, 'score');
         const emaLineVisible = isScoreLegendVisible(legendSelected, 'ema');
+        const segmentAvgVisible = isScoreLegendVisible(legendSelected, 'segmentAvg');
         const values: number[] = [];
 
-        if (scoreLineVisible) {
-            activeScores.forEach((v) => { if (Number.isFinite(v)) values.push(v); });
-            if (emaLineVisible) {
-                activeEma.forEach((v) => { if (v != null && Number.isFinite(v)) values.push(v); });
-            }
-        } else if (emaLineVisible) {
-            activeEma.forEach((v) => { if (v != null && Number.isFinite(v)) values.push(v); });
-        }
+        const pushFinite = (series: Array<number | null>) => {
+            series.forEach((v) => { if (v != null && Number.isFinite(v)) values.push(v); });
+        };
+
+        if (scoreLineVisible) pushFinite(activeScores);
+        if (emaLineVisible) pushFinite(activeEma);
+        if (segmentAvgVisible) pushFinite(activeSegmentAvg);
 
         if (values.length === 0) {
-            activeScores.forEach((v) => { if (Number.isFinite(v)) values.push(v); });
-            activeEma.forEach((v) => { if (v != null && Number.isFinite(v)) values.push(v); });
+            pushFinite(activeScores);
+            pushFinite(activeEma);
+            pushFinite(activeSegmentAvg);
         }
         return snapScoreYRange(values);
     }, [
         legendSelected,
         activeScores,
         activeEma,
+        activeSegmentAvg,
     ]);
 
     const bonusYRange = useMemo(() => {
@@ -310,8 +333,8 @@ export default function ScoreTrendChart({
 
     const option = useMemo(() => {
         const legendData = showBonusChart
-            ? [scoreName, emaLabel, 'Support Bonus']
-            : [scoreName, emaLabel];
+            ? [scoreName, emaLabel, SEGMENT_AVG_LABEL, 'Support Bonus']
+            : [scoreName, emaLabel, SEGMENT_AVG_LABEL];
         const axisPointerLink = showBonusChart ? [{ xAxisIndex: [0, 1] }] : [{ xAxisIndex: [0] }];
 
         const rosterMarkLine = buildRosterMarkLine(rosterUpdateMarkLines, stats.scoreTrend);
@@ -346,6 +369,18 @@ export default function ScoreTrendChart({
                 itemStyle: { color: '#ffc107' },
                 lineStyle: { width: 2, type: 'dashed' as const },
                 z: 4,
+            },
+            {
+                name: SEGMENT_AVG_LABEL,
+                type: 'line' as const,
+                xAxisIndex: 0,
+                yAxisIndex: 0,
+                data: activeSegmentAvg,
+                step: 'end' as const,
+                showSymbol: false,
+                itemStyle: { color: '#ffffff' },
+                lineStyle: { width: 2, type: 'dashed' as const },
+                z: 5,
             },
         ];
 
@@ -555,6 +590,7 @@ export default function ScoreTrendChart({
     }, [
         activeScores,
         activeEma,
+        activeSegmentAvg,
         bonusValues,
         formattedDates,
         dateInterval,

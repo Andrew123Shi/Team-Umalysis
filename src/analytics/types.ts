@@ -268,6 +268,13 @@ export type ScoreTrendPoint = {
     supportCardBonus: number;
     selfTeamRating: number;
     opponentTeamRating: number;
+    /** Session/round/race win for this trend point (grain matches aggregation view). */
+    won: boolean;
+    /**
+     * Per-session race win rate (rounds won / rounds).
+     * Populated only for team overview trends so charts can show race vs trial progression.
+     */
+    raceWinRate?: number;
     rosterUpdate?: RosterUpdate;
 };
 

@@ -11,6 +11,7 @@ import MatchupTable from './charts/MatchupTable';
 
 import ScoreTrendChart from './charts/ScoreTrendChart';
 import TeamRatingTrendChart from './charts/TeamRatingTrendChart';
+import WinRateTrendChart from './charts/WinRateTrendChart';
 
 import SkillTable from './charts/SkillTable';
 
@@ -130,6 +131,7 @@ export default function StatsPanels({
     summaryScope,
     onSummaryScopeChange,
     recentStats,
+    emaSourceTrend,
 
     viewMode = 'team',
 
@@ -150,6 +152,7 @@ export default function StatsPanels({
     summaryScope?: StatsScope;
     onSummaryScopeChange?: (value: StatsScope) => void;
     recentStats?: AggregatedStats;
+    emaSourceTrend?: AggregatedStats['scoreTrend'];
 
     viewMode?: StatCardViewMode | 'distance';
 
@@ -233,6 +236,10 @@ export default function StatsPanels({
     );
     const opponentChart = buildOpponentChart(stats);
     const progressionStats = overviewStatsFor('progression');
+    const progressionUsesRecent = showOverviewScopeControls
+        && overviewSectionScopes.progression === 'recent';
+    const progressionEmaSource = emaSourceTrend
+        ?? (progressionUsesRecent ? stats.scoreTrend : undefined);
     const opponentCharacteristicsStats = overviewStatsFor('opponentCharacteristics');
     const skillStats = overviewStatsFor('skill');
     const racetrackStats = overviewStatsFor('racetrack');
@@ -336,7 +343,11 @@ export default function StatsPanels({
 
                     <Card.Body>
 
-                        <ScoreTrendChart stats={progressionStats} viewMode={viewMode as StatCardViewMode} />
+                        <ScoreTrendChart
+                            stats={progressionStats}
+                            emaSourceTrend={progressionEmaSource}
+                            viewMode={viewMode as StatCardViewMode}
+                        />
 
                     </Card.Body>
 
@@ -344,11 +355,33 @@ export default function StatsPanels({
 
                 {!isUmaView && progressionStats.scoreTrend.length > 0 && (
 
+                    <Card className="app-card mb-3">
+
+                        <Card.Body>
+
+                            <TeamRatingTrendChart
+                                stats={progressionStats}
+                                emaSourceTrend={progressionEmaSource}
+                            />
+
+                        </Card.Body>
+
+                    </Card>
+
+                )}
+
+                {progressionStats.scoreTrend.length > 0 && (
+
                     <Card className="app-card">
 
                         <Card.Body>
 
-                            <TeamRatingTrendChart stats={progressionStats} />
+                            <WinRateTrendChart
+                                stats={progressionStats}
+                                sourceTrend={progressionEmaSource}
+                                showRaceWinRate={isTeamView}
+                                averageSeriesLabel={isUmaView ? 'Average' : undefined}
+                            />
 
                         </Card.Body>
 
