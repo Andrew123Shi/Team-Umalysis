@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Alert, Button, ButtonGroup, Col, Container, Form, ListGroup, Row, Spinner } from 'react-bootstrap';
+import { Alert, Button, ButtonGroup, Col, Form, ListGroup, Row, Spinner } from 'react-bootstrap';
 import RaceDataPresenter from '../components/RaceDataPresenter';
 import { DISTANCE_LABELS, type SessionIndexEntry, type TTRound } from '../analytics/types';
 import { getCourseDisplayName } from '../utils/course';
@@ -36,7 +36,7 @@ function formatReplayRoundDescription(round: TTRound): string {
 }
 
 export default function ReplayPage() {
-    const { sessions, index, loading, error } = useRaceStore();
+    const { sessions, index, loading, error, progress, hasTriedSavedFolder, loadFromFolder } = useRaceStore();
     const [selectedSessionId, setSelectedSessionId] = useState('');
     const [selectedRound, setSelectedRound] = useState(0);
     const [filter, setFilter] = useState('');
@@ -65,91 +65,115 @@ export default function ReplayPage() {
 
     const round = session?.rounds[selectedRound];
 
-    if (loading) return <Container fluid className="pb-5 pt-3 page-shell"><Alert variant="info">Loading...</Alert></Container>;
-    if (error) return <Container fluid className="pb-5 pt-3 page-shell"><Alert variant="danger">{error}</Alert></Container>;
+    if (loading) {
+        return (
+            <div className="page-shell">
+                <Alert variant="info" className="app-card dashboard-loading-alert">
+                    {progress.total > 0 ? `Loading ${progress.loaded}/${progress.total} files...` : 'Loading files...'}
+                </Alert>
+            </div>
+        );
+    }
+    if (error) {
+        return (
+            <div className="page-shell">
+                <Alert variant="danger">{error}</Alert>
+            </div>
+        );
+    }
     if (!sessions.length) {
         return (
-            <Container fluid className="pb-5 pt-3 page-shell">
-                <div className="replay-stage-card empty-state">Load sessions first from Settings or the header Load Folder button.</div>
-            </Container>
+            <div className="page-shell">
+                <div className="app-card empty-state">
+                    <h2 className="h4">Choose Your Team Trials Folder</h2>
+                    <p className="text-muted mb-3">
+                        {hasTriedSavedFolder
+                            ? 'No Team Trials files are loaded. Select the folder where your Team Trials .json files are stored.'
+                            : 'Checking for a saved Team Trials folder...'}
+                    </p>
+                    <Button variant="primary" onClick={loadFromFolder}>
+                        Choose Team Trials Folder
+                    </Button>
+                </div>
+            </div>
         );
     }
 
     return (
-        <Container fluid className="pb-5 pt-3 page-shell">
-        <Row className="replay-layout">
-            <Col md={3}>
-                <div className="replay-sidebar-card p-3">
-                <SectionHeading title="Trials Database" compact className="mt-0" />
-                <Form.Control
-                    type="search"
-                    placeholder="Search Saved Trials"
-                    value={filter}
-                    onChange={(e) => setFilter(e.target.value)}
-                    className="mb-3"
-                />
-                <ListGroup variant="flush" className="replay-trial-list" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
-                    {filteredIndex.map((entry) => {
-                        const won = isSessionVictory(entry.roundsWon, entry.roundCount);
-                        return (
-                        <ListGroup.Item
-                            key={entry.id}
-                            action
-                            active={entry.id === selectedSessionId}
-                            onClick={() => { setSelectedSessionId(entry.id); setSelectedRound(0); }}
-                            className={`replay-trial-item ${won ? 'replay-trial-item--win' : 'replay-trial-item--loss'}`}
-                        >
-                            <div className="small replay-trial-item-title">
-                                {formatTrialLabel(entry, opponentTrainerBySessionId.get(entry.id) ?? entry.opponentTrainerName ?? '')}
-                            </div>
-                            <div className={`small replay-trial-item-outcome ${won ? 'replay-trial-item-outcome--win' : 'replay-trial-item-outcome--loss'}`}>
-                                {formatSessionOutcome(entry)}
-                            </div>
-                        </ListGroup.Item>
-                        );
-                    })}
-                </ListGroup>
-                </div>
-            </Col>
-            <Col md={9}>
-                {!session && (
-                    <div className="replay-stage-card empty-state">Select a Trial to view its replay.</div>
-                )}
-                {session && round && (
-                    <div className="replay-stage-card p-3">
-                        <div className="replay-header-panel d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-                            <div>
-                                <h5 className="mb-0">{session.fileName}</h5>
-                                <div className="text-muted small">
-                                    {formatReplayRoundDescription(round)}
-                                </div>
-                            </div>
-                            <ButtonGroup>
-                                {session.rounds.map((r, i) => (
-                                    <Button
-                                        key={r.round}
-                                        variant={i === selectedRound ? 'primary' : 'outline-secondary'}
-                                        size="sm"
-                                        onClick={() => setSelectedRound(i)}
-                                    >
-                                        R{r.round}: {DISTANCE_LABELS[r.distanceType] ?? 'Unknown'}
-                                    </Button>
-                                ))}
-                            </ButtonGroup>
-                        </div>
-                        <RaceDataPresenter
-                            key={`${session.id}-${selectedRound}`}
-                            raceHorseInfo={round.parsedRace.raceHorseInfo}
-                            raceData={round.parsedRace.raceData}
-                            detectedCourseId={round.parsedRace.detectedCourseId}
-                            raceType={round.parsedRace.raceType}
-                            trackDetails={round.parsedRace.trackDetails}
+        <div className="page-shell">
+            <Row className="replay-layout">
+                <Col md={3}>
+                    <div className="replay-sidebar-card p-3">
+                        <SectionHeading title="Trials Database" compact className="mt-0" />
+                        <Form.Control
+                            type="search"
+                            placeholder="Search Saved Trials"
+                            value={filter}
+                            onChange={(e) => setFilter(e.target.value)}
+                            className="mb-3"
                         />
+                        <ListGroup variant="flush" className="replay-trial-list" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+                            {filteredIndex.map((entry) => {
+                                const won = isSessionVictory(entry.roundsWon, entry.roundCount);
+                                return (
+                                    <ListGroup.Item
+                                        key={entry.id}
+                                        action
+                                        active={entry.id === selectedSessionId}
+                                        onClick={() => { setSelectedSessionId(entry.id); setSelectedRound(0); }}
+                                        className={`replay-trial-item ${won ? 'replay-trial-item--win' : 'replay-trial-item--loss'}`}
+                                    >
+                                        <div className="small replay-trial-item-title">
+                                            {formatTrialLabel(entry, opponentTrainerBySessionId.get(entry.id) ?? entry.opponentTrainerName ?? '')}
+                                        </div>
+                                        <div className={`small replay-trial-item-outcome ${won ? 'replay-trial-item-outcome--win' : 'replay-trial-item-outcome--loss'}`}>
+                                            {formatSessionOutcome(entry)}
+                                        </div>
+                                    </ListGroup.Item>
+                                );
+                            })}
+                        </ListGroup>
                     </div>
-                )}
-                {session && !round && <Spinner animation="border" size="sm" />}
-            </Col>
-        </Row>
-        </Container>
+                </Col>
+                <Col md={9}>
+                    {!session && (
+                        <div className="replay-stage-card empty-state">Select a Trial to view its replay.</div>
+                    )}
+                    {session && round && (
+                        <div className="replay-stage-card p-3">
+                            <div className="replay-header-panel d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                                <div>
+                                    <h5 className="mb-0">{session.fileName}</h5>
+                                    <div className="text-muted small">
+                                        {formatReplayRoundDescription(round)}
+                                    </div>
+                                </div>
+                                <ButtonGroup>
+                                    {session.rounds.map((r, i) => (
+                                        <Button
+                                            key={r.round}
+                                            variant={i === selectedRound ? 'primary' : 'outline-secondary'}
+                                            size="sm"
+                                            onClick={() => setSelectedRound(i)}
+                                        >
+                                            R{r.round}: {DISTANCE_LABELS[r.distanceType] ?? 'Unknown'}
+                                        </Button>
+                                    ))}
+                                </ButtonGroup>
+                            </div>
+                            <RaceDataPresenter
+                                key={`${session.id}-${selectedRound}`}
+                                raceHorseInfo={round.parsedRace.raceHorseInfo}
+                                raceData={round.parsedRace.raceData}
+                                detectedCourseId={round.parsedRace.detectedCourseId}
+                                raceType={round.parsedRace.raceType}
+                                trackDetails={round.parsedRace.trackDetails}
+                            />
+                        </div>
+                    )}
+                    {session && !round && <Spinner animation="border" size="sm" />}
+                </Col>
+            </Row>
+        </div>
     );
 }
