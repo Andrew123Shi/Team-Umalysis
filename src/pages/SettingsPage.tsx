@@ -11,10 +11,12 @@ export default function SettingsPage() {
         latestFileName,
         trainerName: activeTrainer,
         trainerNameOverride,
+        scoreBonuses,
         index,
         loadFromFolder,
         reload,
         saveTrainerNameOverride,
+        setScoreBonusEnabled,
         loading,
         progress,
     } = useRaceStore();
@@ -93,6 +95,50 @@ export default function SettingsPage() {
                     <br />
                     <strong>Detected player:</strong> {activeTrainer || 'pending load'}
                 </Alert>
+            </div>
+
+            <div className="settings-card mt-3">
+                <SectionHeading level="section" title="Settings: Score Bonuses" className="mt-0" />
+
+                <p className="text-muted">
+                    Choose which bonuses are included in uma- and distance-level score analytics.
+                    Changes apply immediately and are saved in this browser.
+                </p>
+
+                <Form.Check
+                    type="checkbox"
+                    id="score-bonus-ace"
+                    checked={scoreBonuses.ace}
+                    onChange={(e) => setScoreBonusEnabled('ace', e.target.checked)}
+                    label="Ace Bonus"
+                />
+                <Form.Check
+                    type="checkbox"
+                    id="score-bonus-opponent-rating"
+                    checked={scoreBonuses.opponentRating}
+                    onChange={(e) => setScoreBonusEnabled('opponentRating', e.target.checked)}
+                    label="Opponent Rating Bonus"
+                />
+                <Form.Check
+                    type="checkbox"
+                    id="score-bonus-streak"
+                    checked={scoreBonuses.streak}
+                    onChange={(e) => setScoreBonusEnabled('streak', e.target.checked)}
+                    label="Streak Bonus"
+                />
+                <Form.Check
+                    type="checkbox"
+                    id="score-bonus-support-card"
+                    checked={scoreBonuses.supportCard}
+                    onChange={(e) => setScoreBonusEnabled('supportCard', e.target.checked)}
+                    label="Support Card Bonus"
+                />
+
+                <Form.Text className="d-block text-muted mt-2">
+                    With all options off, uma analytics use base score and distance analytics also
+                    include the All Members Placed score. Overall team score remains the in-game
+                    total; its score chart has a separate bonus-normalized view.
+                </Form.Text>
             </div>
         </Container>
     );

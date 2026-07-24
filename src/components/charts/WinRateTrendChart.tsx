@@ -13,7 +13,7 @@ import SectionHeading from '../SectionHeading';
 
 const GRID_LEFT = 82;
 const GRID_RIGHT = 72;
-const TRIAL_WIN_RATE_LABEL = 'Trial Win Rate';
+const TRIAL_WIN_RATE_LABEL = 'Overall Win Rate';
 const RACE_WIN_RATE_LABEL = 'Race Win Rate';
 const WIN_RATE_LABEL = 'Win Rate';
 const ROSTER_AVG_LABEL = 'Roster Average';
