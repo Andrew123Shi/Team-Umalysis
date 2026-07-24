@@ -1,5 +1,5 @@
 {
-  "version": "2026-07-18",
+  "version": "2026-07-23",
   "chara": [
     {
       "id": 1001,
@@ -15739,6 +15739,43 @@
       "iconId": 20013
     },
     {
+      "id": 110461,
+      "name": "α-star*",
+      "gradeValue": 340,
+      "tagId": [
+        "401",
+        "402"
+      ],
+      "rarity": 5,
+      "conditionGroups": [
+        {
+          "condition": "distance_rate>=40&distance_rate<=50&distance_diff_rate<=10&ground_type==2",
+          "baseTime": 60000,
+          "effects": [
+            {
+              "type": 27,
+              "value": 2500
+            },
+            {
+              "type": 9,
+              "value": 350
+            }
+          ]
+        },
+        {
+          "condition": "distance_rate>=40&distance_rate<=50&distance_diff_rate<=10",
+          "baseTime": 60000,
+          "effects": [
+            {
+              "type": 27,
+              "value": 2500
+            }
+          ]
+        }
+      ],
+      "iconId": 20013
+    },
+    {
       "id": 110521,
       "name": "114th Time's the Charm",
       "gradeValue": 340,
@@ -27099,6 +27136,62 @@
       "iconId": 20141
     },
     {
+      "id": 210071,
+      "name": "I Wanna Win with You",
+      "gradeValue": 633,
+      "tagId": [
+        "401",
+        "403",
+        "803"
+      ],
+      "rarity": 2,
+      "conditionGroups": [
+        {
+          "condition": "distance_rate_after_random==50&order_rate<=65",
+          "baseTime": 12000,
+          "effects": [
+            {
+              "type": 27,
+              "value": 3500
+            },
+            {
+              "type": 31,
+              "value": 2000
+            }
+          ]
+        }
+      ],
+      "iconId": 20152
+    },
+    {
+      "id": 210072,
+      "name": "On the Way to Our Dream",
+      "gradeValue": 263,
+      "tagId": [
+        "401",
+        "403",
+        "803"
+      ],
+      "rarity": 1,
+      "conditionGroups": [
+        {
+          "condition": "distance_rate_after_random==50&order_rate<=65",
+          "baseTime": 12000,
+          "effects": [
+            {
+              "type": 27,
+              "value": 1500
+            },
+            {
+              "type": 31,
+              "value": 700
+            }
+          ]
+        }
+      ],
+      "iconId": 20151
+    },
+    {
       "id": 210081,
       "name": "Past My Limits",
       "gradeValue": 633,
@@ -29774,6 +29867,43 @@
       "iconId": 20011
     },
     {
+      "id": 910461,
+      "name": "α-star*",
+      "gradeValue": 180,
+      "tagId": [
+        "401",
+        "402"
+      ],
+      "rarity": 1,
+      "conditionGroups": [
+        {
+          "condition": "distance_rate>=40&distance_rate<=50&distance_diff_rate<=10&ground_type==2",
+          "baseTime": 36000,
+          "effects": [
+            {
+              "type": 27,
+              "value": 500
+            },
+            {
+              "type": 9,
+              "value": 50
+            }
+          ]
+        },
+        {
+          "condition": "distance_rate>=40&distance_rate<=50&distance_diff_rate<=10",
+          "baseTime": 36000,
+          "effects": [
+            {
+              "type": 27,
+              "value": 500
+            }
+          ]
+        }
+      ],
+      "iconId": 20011
+    },
+    {
       "id": 910521,
       "name": "114th Time's the Charm",
       "gradeValue": 180,
@@ -31535,6 +31665,19 @@
       ]
     },
     {
+      "id": 10083,
+      "name": "[Event Producer] Light Hello",
+      "charaId": 9008,
+      "raceBonus": 5,
+      "raceBonusByLimitBreak": [
+        1,
+        1,
+        1,
+        5,
+        5
+      ]
+    },
+    {
       "id": 20001,
       "name": "[Well, Look Who's Home] Fuji Kiseki",
       "charaId": 1005,
@@ -32770,6 +32913,19 @@
       ]
     },
     {
+      "id": 30052,
+      "name": "[From the Ground Up] Light Hello",
+      "charaId": 9008,
+      "raceBonus": 1,
+      "raceBonusByLimitBreak": [
+        0,
+        1,
+        1,
+        1,
+        1
+      ]
+    },
+    {
       "id": 30053,
       "name": "[Hands Up, Crook!] Taiki Shuttle",
       "charaId": 1010,
@@ -33394,6 +33550,19 @@
       ]
     },
     {
+      "id": 30101,
+      "name": "[Q≠0] Agnes Tachyon",
+      "charaId": 1032,
+      "raceBonus": 0,
+      "raceBonusByLimitBreak": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
       "id": 30102,
       "name": "[Twinkle in Your Eyes ∞] El Condor Pasa",
       "charaId": 1014,
@@ -33508,6 +33677,19 @@
         1,
         1,
         1
+      ]
+    },
+    {
+      "id": 30121,
+      "name": "[U & Me] Mihono Bourbon",
+      "charaId": 1026,
+      "raceBonus": 0,
+      "raceBonusByLimitBreak": [
+        0,
+        0,
+        0,
+        0,
+        0
       ]
     }
   ],
@@ -46757,6 +46939,20 @@
       "solvableType": 0
     },
     {
+      "id": 210071,
+      "needSkillPoint": 200,
+      "statusType": 0,
+      "statusValue": 0,
+      "solvableType": 0
+    },
+    {
+      "id": 210072,
+      "needSkillPoint": 200,
+      "statusType": 0,
+      "statusValue": 0,
+      "solvableType": 0
+    },
+    {
       "id": 210081,
       "needSkillPoint": 200,
       "statusType": 0,
@@ -47402,6 +47598,13 @@
     },
     {
       "id": 910451,
+      "needSkillPoint": 200,
+      "statusType": 0,
+      "statusValue": 0,
+      "solvableType": 0
+    },
+    {
+      "id": 910461,
       "needSkillPoint": 200,
       "statusType": 0,
       "statusValue": 0,
