@@ -82,8 +82,8 @@ class RaceDataPresenter extends React.PureComponent<RaceDataPresenterProps, Race
                 const frameOrder = d['frame_order'] - 1; // 0-indexed
                 const charaId = d['chara_id'];
                 const charaDisplayName = charaId in UMDatabaseWrapper.charas ? UMDatabaseWrapper.charas[charaId].name : unknownCharaTag;
-                const trainerNameSuffix = d['trainer_name'] ? ` [${d['trainer_name']}]` : '';
-                nameFromRaceHorseInfo[frameOrder] = ` ${charaDisplayName}${trainerNameSuffix}`;
+                const trainerNameSuffix = d['trainer_name'] ? ` ${d['trainer_name']}` : '';
+                nameFromRaceHorseInfo[frameOrder] = `${charaDisplayName}${trainerNameSuffix}`;
             });
         }
 
@@ -91,7 +91,8 @@ class RaceDataPresenter extends React.PureComponent<RaceDataPresenterProps, Race
         for (let frameOrder = 0; frameOrder < raceData.horseResult.length; frameOrder++) {
             // frameOrder is 0 ordered.
             const finishOrder = raceData.horseResult[frameOrder].finishOrder! + 1; // 1-indexed
-            m[frameOrder] = `#${finishOrder}${nameFromRaceHorseInfo[frameOrder] ?? ''}`;
+            const name = nameFromRaceHorseInfo[frameOrder];
+            m[frameOrder] = name ? `#${finishOrder} ${name}` : `#${finishOrder}`;
         }
         return m;
     });

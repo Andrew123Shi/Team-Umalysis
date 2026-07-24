@@ -113,8 +113,13 @@ const CharaTable: React.FC<CharaTableProps> = ({ data, courseId, showPredictionC
                         const parentGroup1 = row.parents.filter(p => Math.floor(p.positionId / 10) === 1);
                         const parentGroup2 = row.parents.filter(p => Math.floor(p.positionId / 10) === 2);
 
+                        const teamClass = row.teamSide === 'player'
+                            ? ' chara-row--player'
+                            : row.teamSide === 'opponent'
+                                ? ' chara-row--opponent'
+                                : '';
                         const mainRow = (
-                            <tr key={`main-${row.frameOrder}`} className={isExpanded ? 'expanded' : ''} onClick={() => toggleRow(row.frameOrder)}>
+                            <tr key={`main-${row.frameOrder}`} className={`${isExpanded ? 'expanded' : ''}${teamClass}`.trim()} onClick={() => toggleRow(row.frameOrder)}>
                                 {charaTableColumns.map(col => {
                                     // Special handling for certain columns
                                     if (col.key === 'expand') {
@@ -149,7 +154,7 @@ const CharaTable: React.FC<CharaTableProps> = ({ data, courseId, showPredictionC
                         }
 
                         const expandedRow = (
-                            <tr key={`expanded-${row.frameOrder}`}>
+                            <tr key={`expanded-${row.frameOrder}`} className={`chara-row-expanded${teamClass}`}>
                                 <td colSpan={charaTableColumns.length} className="expanded-content">
                                     <div className="dashboard-grid">
                                         {/* Skills Panel */}

@@ -26,6 +26,7 @@ import { computeHeuristicEvents } from "../../../RaceReplay/utils/computeHeurist
 import { calculateRaceDistance } from "../../utils/RacePresenterUtils";
 import { CharaTableData, SkillEventData } from "./types";
 import { RaceSimulateFrameData } from "../../../../data/race_data_pb";
+import { detectPlayerIdentityFromSession } from "../../../../analytics/umaIdentity";
 
 function interpolateDistance(frames: RaceSimulateFrameData[], horseIndex: number, time: number): number {
     if (!frames || frames.length === 0) return 0;
@@ -83,6 +84,10 @@ export const computeCharaTableData = (
     if (!raceHorseInfo || raceHorseInfo.length === 0) {
         return [];
     }
+
+    const playerIdentity = detectPlayerIdentityFromSession([{ race_horse_data_array: raceHorseInfo }]);
+    const playerTeamId = playerIdentity.teamId;
+    const opponentTeamId = playerTeamId === 1 ? 2 : 1;
 
     const distanceCategory = getDistanceCategory(raceDistance);
     const trackSlopes = effectiveCourseId ? (GameDataLoader.courseData as any)[effectiveCourseId]?.slopes ?? [] : [];
@@ -153,12 +158,12 @@ export const computeCharaTableData = (
         const horseResult = raceData.horseResult[frameOrder];
 
         const trainedCharaData = fromRaceHorseData(data);
-        const teamId = typeof data['team_id'] === 'number' ? data['team_id'] : undefined;
-        const subLabel = trainedCharaData.viewerName
-            ? `[${trainedCharaData.viewerName}]`
-            : teamId !== undefined
-                ? `[Team ${teamId}]`
-                : undefined;
+        const teamId = Number(data['team_id'] ?? 0);
+        const teamSide: CharaTableData['teamSide'] =
+            teamId === playerTeamId ? 'player'
+                : teamId === opponentTeamId ? 'opponent'
+                    : undefined;
+        const subLabel = trainedCharaData.viewerName || undefined;
 
 
         // Calculate Last Spurt Speed
@@ -567,6 +572,7 @@ export const computeCharaTableData = (
             trainedChara: trainedCharaData,
             chara: UMDatabaseWrapper.charas[trainedCharaData.charaId],
             subLabel,
+            teamSide,
 
             frameOrder: frameOrder + 1,
             finishOrder: horseResult.finishOrder! + 1,

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build tracks/course_data JSON from master.mdb and bundled courseeventparams."""
+"""Build course metadata and geometry from master.mdb plus bundled sources."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 COURSE_EVENT_PARAMS_DIR = SCRIPT_DIR / "courseeventparams"
+COURSE_GEOMETRY_FALLBACKS_PATH = SCRIPT_DIR / "course_geometry_fallbacks.json"
 SKIP_COURSE_IDS = {11201, 11202}
 
 
@@ -70,10 +71,19 @@ def parse_course_events(events: list[dict]) -> tuple[list[dict], list[dict], lis
     return corners, straights, slopes
 
 
+def load_geometry_fallbacks() -> dict[str, dict]:
+    if not COURSE_GEOMETRY_FALLBACKS_PATH.exists():
+        return {}
+    with open(COURSE_GEOMETRY_FALLBACKS_PATH, encoding="utf-8") as handle:
+        payload = json.load(handle)
+    return payload.get("courses", {})
+
+
 def build_course_data(db_path: str, existing: dict | None = None) -> tuple[dict, list[str]]:
     existing = existing or {}
     warnings: list[str] = []
     course_set_status: dict[int, list[int]] = {}
+    geometry_fallbacks = load_geometry_fallbacks()
 
     connection = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
     connection.row_factory = sqlite3.Row
@@ -104,21 +114,7 @@ def build_course_data(db_path: str, existing: dict | None = None) -> tuple[dict,
             continue
 
         course_key = str(course_id)
-        params_path = COURSE_EVENT_PARAMS_DIR / f"{course_id}.json"
-        if not params_path.exists():
-            if course_key in existing:
-                courses[course_key] = existing[course_key]
-                warnings.append(f"kept existing geometry for course {course_id} (no courseeventparams)")
-            else:
-                warnings.append(f"skipped course {course_id} (no courseeventparams)")
-            continue
-
-        with open(params_path, encoding="utf-8") as handle:
-            events = json.load(handle)["courseParams"]
-        corners, straights, slopes = parse_course_events(events)
-        css_id = row["course_set_status_id"]
-
-        courses[course_key] = {
+        course = {
             "raceTrackId": row["race_track_id"],
             "distance": row["distance"],
             "distanceType": distance_type(row["distance"]),
@@ -128,11 +124,37 @@ def build_course_data(db_path: str, existing: dict | None = None) -> tuple[dict,
             "laneMax": row["float_lane_max"],
             "finishTimeMin": row["finish_time_min"],
             "finishTimeMax": row["finish_time_max"],
-            "courseSetStatus": course_set_status.get(css_id, []),
-            "corners": corners,
-            "straights": straights,
-            "slopes": slopes,
+            "courseSetStatus": course_set_status.get(row["course_set_status_id"], []),
         }
+        params_path = COURSE_EVENT_PARAMS_DIR / f"{course_id}.json"
+        if not params_path.exists():
+            if course_key in geometry_fallbacks:
+                fallback = geometry_fallbacks[course_key]
+                course["corners"] = fallback.get("corners", [])
+                course["straights"] = fallback.get("straights", [])
+                course["slopes"] = fallback.get("slopes", [])
+                warnings.append(f"used bundled fallback geometry for course {course_id}")
+            elif course_key in existing:
+                previous = existing[course_key]
+                course["corners"] = previous.get("corners", [])
+                course["straights"] = previous.get("straights", [])
+                course["slopes"] = previous.get("slopes", [])
+                warnings.append(f"kept existing geometry for course {course_id} (no courseeventparams)")
+            else:
+                course["corners"] = []
+                course["straights"] = []
+                course["slopes"] = []
+                warnings.append(f"added metadata-only course {course_id} (no courseeventparams)")
+            courses[course_key] = course
+            continue
+
+        with open(params_path, encoding="utf-8") as handle:
+            events = json.load(handle)["courseParams"]
+        corners, straights, slopes = parse_course_events(events)
+        course["corners"] = corners
+        course["straights"] = straights
+        course["slopes"] = slopes
+        courses[course_key] = course
 
     connection.close()
     return courses, warnings

@@ -1,0 +1,174 @@
+{
+  "_source": "https://hakuraku.moe/data/gamedata.bin.gz",
+  "_retrieved": "2026-07-23",
+  "courses": {
+    "11301": {
+      "corners": [
+        { "start": 300, "length": 100 },
+        { "start": 400, "length": 100 },
+        { "start": 900, "length": 100 },
+        { "start": 1000, "length": 100 }
+      ],
+      "straights": [
+        { "start": 0, "end": 300, "frontType": 1 },
+        { "start": 500, "end": 900, "frontType": 2 },
+        { "start": 1100, "end": 1400, "frontType": 1 }
+      ],
+      "slopes": []
+    },
+    "11302": {
+      "corners": [
+        { "start": 500, "length": 100 },
+        { "start": 600, "length": 100 },
+        { "start": 1100, "length": 100 },
+        { "start": 1200, "length": 100 }
+      ],
+      "straights": [
+        { "start": 100, "end": 500, "frontType": 1 },
+        { "start": 700, "end": 1100, "frontType": 2 },
+        { "start": 1300, "end": 1600, "frontType": 1 }
+      ],
+      "slopes": []
+    },
+    "11303": {
+      "corners": [
+        { "start": 400, "length": 100 },
+        { "start": 500, "length": 100 },
+        { "start": 1000, "length": 100 },
+        { "start": 1100, "length": 100 },
+        { "start": 1600, "length": 100 },
+        { "start": 1700, "length": 100 }
+      ],
+      "straights": [
+        { "start": 0, "end": 400, "frontType": 2 },
+        { "start": 600, "end": 1000, "frontType": 1 },
+        { "start": 1200, "end": 1600, "frontType": 2 },
+        { "start": 1800, "end": 2100, "frontType": 1 }
+      ],
+      "slopes": []
+    },
+    "11401": {
+      "corners": [
+        { "start": 370, "length": 170 },
+        { "start": 540, "length": 152 }
+      ],
+      "straights": [
+        { "start": 0, "end": 370, "frontType": 2 },
+        { "start": 692, "end": 1000, "frontType": 1 }
+      ],
+      "slopes": []
+    },
+    "11402": {
+      "corners": [
+        { "start": 260, "length": 180 },
+        { "start": 440, "length": 160 },
+        { "start": 970, "length": 170 },
+        { "start": 1140, "length": 152 }
+      ],
+      "straights": [
+        { "start": 0, "end": 260, "frontType": 1 },
+        { "start": 600, "end": 970, "frontType": 2 },
+        { "start": 1292, "end": 1600, "frontType": 1 }
+      ],
+      "slopes": []
+    },
+    "11403": {
+      "corners": [
+        { "start": 460, "length": 180 },
+        { "start": 640, "length": 160 },
+        { "start": 1170, "length": 170 },
+        { "start": 1340, "length": 152 }
+      ],
+      "straights": [
+        { "start": 90, "end": 460, "frontType": 1 },
+        { "start": 800, "end": 1170, "frontType": 2 },
+        { "start": 1492, "end": 1800, "frontType": 1 }
+      ],
+      "slopes": []
+    },
+    "11404": {
+      "corners": [
+        { "start": 370, "length": 170 },
+        { "start": 540, "length": 150 },
+        { "start": 1060, "length": 180 },
+        { "start": 1240, "length": 160 },
+        { "start": 1770, "length": 170 },
+        { "start": 1940, "length": 152 }
+      ],
+      "straights": [
+        { "start": 0, "end": 370, "frontType": 2 },
+        { "start": 690, "end": 1060, "frontType": 1 },
+        { "start": 1400, "end": 1770, "frontType": 2 },
+        { "start": 2092, "end": 2400, "frontType": 1 }
+      ],
+      "slopes": []
+    },
+    "11501": {
+      "corners": [
+        { "start": 500, "length": 200 },
+        { "start": 700, "length": 200 }
+      ],
+      "straights": [
+        { "start": 100, "end": 500, "frontType": 2 },
+        { "start": 900, "end": 1200, "frontType": 1 }
+      ],
+      "slopes": [
+        { "start": 100, "length": 375, "slope": 10000 },
+        { "start": 475, "length": 450, "slope": -15000 },
+        { "start": 975, "length": 175, "slope": 10000 }
+      ]
+    },
+    "11502": {
+      "corners": [
+        { "start": 900, "length": 200 },
+        { "start": 1100, "length": 200 }
+      ],
+      "straights": [
+        { "start": 500, "end": 900, "frontType": 2 },
+        { "start": 1300, "end": 1600, "frontType": 1 }
+      ],
+      "slopes": [
+        { "start": 500, "length": 375, "slope": 10000 },
+        { "start": 875, "length": 450, "slope": -15000 },
+        { "start": 1375, "length": 175, "slope": 10000 }
+      ]
+    },
+    "11503": {
+      "corners": [
+        { "start": 300, "length": 200 },
+        { "start": 500, "length": 200 },
+        { "start": 1100, "length": 200 },
+        { "start": 1300, "length": 200 }
+      ],
+      "straights": [
+        { "start": 0, "end": 300, "frontType": 1 },
+        { "start": 700, "end": 1100, "frontType": 2 },
+        { "start": 1500, "end": 1800, "frontType": 1 }
+      ],
+      "slopes": [
+        { "start": 0, "length": 150, "slope": 10000 },
+        { "start": 700, "length": 450, "slope": -15000 },
+        { "start": 1575, "length": 175, "slope": 10000 }
+      ]
+    },
+    "11504": {
+      "corners": [
+        { "start": 500, "length": 200 },
+        { "start": 700, "length": 200 },
+        { "start": 1300, "length": 200 },
+        { "start": 1500, "length": 200 }
+      ],
+      "straights": [
+        { "start": 100, "end": 500, "frontType": 1 },
+        { "start": 900, "end": 1300, "frontType": 2 },
+        { "start": 1700, "end": 2000, "frontType": 1 }
+      ],
+      "slopes": [
+        { "start": 175, "length": 175, "slope": 10000 },
+        { "start": 900, "length": 375, "slope": 10000 },
+        { "start": 1275, "length": 450, "slope": -15000 },
+        { "start": 1775, "length": 175, "slope": 10000 }
+      ]
+    }
+  }
+}

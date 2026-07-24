@@ -34,6 +34,7 @@ export type CharaTableData = {
     trainedChara: TrainedCharaData,
     chara: Chara | undefined,
     subLabel?: string,
+    teamSide?: 'player' | 'opponent',
 
     frameOrder: number,
     finishOrder: number,

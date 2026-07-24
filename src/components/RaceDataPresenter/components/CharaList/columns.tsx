@@ -221,33 +221,42 @@ const baseCharaTableColumns: CharaColumnDef[] = [
         header: 'Character',
         cellClassName: 'chara-name-cell',
         renderCell: (row) => {
-            const rankInfo = getRankIcon(row.trainedChara.rankScore);
-            const charaThumb = AssetLoader.getCharaThumb(row.trainedChara.cardId);
-            return row.chara ? (
+            const rankInfo = row.chara ? getRankIcon(row.trainedChara.rankScore) : null;
+            const charaThumb = row.chara && row.trainedChara.cardId
+                ? AssetLoader.getCharaThumb(row.trainedChara.cardId)
+                : '';
+            const displayName = (row.chara?.name ?? unknownCharaTag).trim();
+            return (
                 <div className="col-chara-ident">
-                    <img
-                        src={rankInfo.icon}
-                        alt={rankInfo.name}
-                        title={formatScore(row.trainedChara.rankScore)}
-                        className="col-rank-icon"
-                    />
-                    {charaThumb && (
-                        <img
-                            src={charaThumb}
-                            alt={UMDatabaseWrapper.cards[row.trainedChara.cardId]?.name ?? String(row.trainedChara.cardId)}
-                            title={UMDatabaseWrapper.cards[row.trainedChara.cardId]?.name ?? String(row.trainedChara.cardId)}
-                            className="col-chara-thumb"
-                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                        />
-                    )}
-                    <div>
-                        <span className="chara-name-primary">{row.chara.name}</span>
+                    <span className="col-rank-icon-slot">
+                        {rankInfo?.icon && (
+                            <img
+                                src={rankInfo.icon}
+                                alt={rankInfo.name}
+                                title={formatScore(row.trainedChara.rankScore)}
+                                className="col-rank-icon"
+                            />
+                        )}
+                    </span>
+                    <span className="col-chara-thumb-slot">
+                        {charaThumb && (
+                            <img
+                                src={charaThumb}
+                                alt={UMDatabaseWrapper.cards[row.trainedChara.cardId]?.name ?? String(row.trainedChara.cardId)}
+                                title={UMDatabaseWrapper.cards[row.trainedChara.cardId]?.name ?? String(row.trainedChara.cardId)}
+                                className="col-chara-thumb"
+                                onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }}
+                            />
+                        )}
+                    </span>
+                    <div className="col-chara-name-block">
+                        <span className="chara-name-primary">{displayName}</span>
                         {row.subLabel && (
                             <span className="chara-viewer-name">{row.subLabel}</span>
                         )}
                     </div>
                 </div>
-            ) : unknownCharaTag;
+            );
         },
     },
     {

@@ -130,6 +130,16 @@
     transition: background 0.1s;
 }
 
+.char-vis-place {
+    display: inline-block;
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+}
+
+.char-vis-name {
+    text-align: left;
+}
+
 .char-vis-btn:hover {
     background: rgba(100, 181, 246, 0.12);
     color: var(--app-text-primary);
@@ -386,6 +396,45 @@
     width: 100%;
     height: 100%;
     pointer-events: none;
+}
+
+.rr-playback-btn {
+    width: 72px;
+    flex: 0 0 72px;
+}
+
+.rr-timeline-wrap {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 160px;
+}
+
+.rr-phase-track {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 32px;
+    transform: translateY(-50%);
+    pointer-events: none;
+    z-index: 4;
+}
+
+.rr-phase-marker {
+    position: absolute;
+    top: 4px;
+    bottom: 4px;
+    width: 3px;
+    transform: translateX(-1px);
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.75), 0 0 6px rgba(255, 255, 255, 0.45);
+}
+
+.rr-timeline-range {
+    width: 100%;
+    position: relative;
+    z-index: 2;
 }
 
 .rr-mobile-fullscreen-row {

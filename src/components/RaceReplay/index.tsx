@@ -98,6 +98,45 @@ const RaceReplay: React.FC<RaceReplayProps> = ({
         return 0;
     }, [frames, raceData.horseResult]);
 
+    const phaseMarkers = useMemo(() => {
+        if (!goalInX || frames.length < 2 || endTime <= startTime) return null;
+
+        const leadingDistance = (frame: any) =>
+            Math.max(0, ...(frame.horseFrame ?? []).map((horse: any) => horse?.distance ?? 0));
+        const timeAtDistance = (distance: number) => {
+            let previous = frames[0];
+            let previousDistance = leadingDistance(previous);
+            if (previousDistance >= distance) return previous.time ?? startTime;
+
+            for (let index = 1; index < frames.length; index++) {
+                const current = frames[index];
+                const currentDistance = leadingDistance(current);
+                if (currentDistance >= distance) {
+                    const previousTime = previous.time ?? startTime;
+                    const currentTime = current.time ?? previousTime;
+                    const distanceDelta = currentDistance - previousDistance;
+                    if (distanceDelta <= 1e-6) return currentTime;
+                    const ratio = clamp((distance - previousDistance) / distanceDelta, 0, 1);
+                    return previousTime + (currentTime - previousTime) * ratio;
+                }
+                previous = current;
+                previousDistance = currentDistance;
+            }
+            return endTime;
+        };
+        const markerLeft = (time: number) =>
+            `${clamp((time - startTime) / (endTime - startTime), 0, 1) * 100}%`;
+        const midTime = timeAtDistance(goalInX / 6);
+        const lateTime = timeAtDistance(goalInX * 2 / 3);
+
+        return {
+            midMarkerLeft: markerLeft(midTime),
+            lateMarkerLeft: markerLeft(lateTime),
+            midTime,
+            lateTime,
+        };
+    }, [endTime, frames, goalInX, startTime]);
+
     const availableTracks = useAvailableTracks(goalInX);
     const { selectedTrackId, setSelectedTrackId, guessStatus } = useGuessTrack(detectedCourseId, goalInX, availableTracks);
 
@@ -622,10 +661,14 @@ const RaceReplay: React.FC<RaceReplayProps> = ({
                         const color = teamColorFor(idx, horseInfoByIdx[idx] ?? {}, trainerColors);
                         const stateClass = state === 1 ? " char-vis-dim" : state === 2 ? " char-vis-hidden" : "";
                         const stateTitle = state === 0 ? "Click to dim" : state === 1 ? "Click to hide" : "Click to show";
+                        const placeMatch = name.match(/^(#\d+)\s*(.*)$/);
+                        const placeLabel = placeMatch?.[1] ?? '';
+                        const nameLabel = placeMatch?.[2] ?? name;
                         return (
                             <button key={name} className={`char-vis-btn${stateClass}`} onClick={() => cycleVisibility(name)} title={stateTitle} onMouseEnter={() => setHoveredLegendName(name)} onMouseLeave={() => setHoveredLegendName(null)}>
                                 <span className="char-vis-dot" style={{ background: color }} />
-                                {name}
+                                {placeLabel && <span className="char-vis-place">{placeLabel}</span>}
+                                <span className="char-vis-name">{nameLabel}</span>
                             </button>
                         );
                     })}
@@ -698,16 +741,32 @@ const RaceReplay: React.FC<RaceReplayProps> = ({
 
                 <div className="d-flex align-items-center justify-content-between mt-2 rr-playback-row">
                     <div className="d-flex align-items-center flex-grow-1">
-                        <Button onClick={playPause} className="me-3">{isPlaying ? "Pause" : "Play"}</Button>
-                        <Form.Control
-                            type="range"
-                            min={startTime}
-                            max={endTime}
-                            step={0.001}
-                            value={clampedRenderTime}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRenderTime(clamp(parseFloat(e.target.value), startTime, endTime))}
-                            className="flex-grow-1"
-                        />
+                        <Button onClick={playPause} className="me-3 rr-playback-btn">{isPlaying ? "Pause" : "Play"}</Button>
+                        <div className="rr-timeline-wrap">
+                            {phaseMarkers && (
+                                <div className="rr-phase-track" aria-hidden="true">
+                                    <div
+                                        className="rr-phase-marker"
+                                        style={{ left: phaseMarkers.midMarkerLeft }}
+                                        title={`Mid race starts at ${phaseMarkers.midTime.toFixed(2)}s`}
+                                    />
+                                    <div
+                                        className="rr-phase-marker"
+                                        style={{ left: phaseMarkers.lateMarkerLeft }}
+                                        title={`Late race starts at ${phaseMarkers.lateTime.toFixed(2)}s`}
+                                    />
+                                </div>
+                            )}
+                            <Form.Control
+                                type="range"
+                                min={startTime}
+                                max={endTime}
+                                step={0.001}
+                                value={clampedRenderTime}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRenderTime(clamp(parseFloat(e.target.value), startTime, endTime))}
+                                className="rr-timeline-range"
+                            />
+                        </div>
                         <span className="ms-3">{clampedRenderTime.toFixed(2)}s / {endTime.toFixed(2)}s</span>
                     </div>
                     <div className="ms-3">
