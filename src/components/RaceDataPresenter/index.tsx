@@ -97,6 +97,32 @@ class RaceDataPresenter extends React.PureComponent<RaceDataPresenterProps, Race
         return m;
     });
 
+    /** Gate/frame-number labels for the character analysis dropdown (sorted 1…N). */
+    charaSelectOptions = memoize((raceHorseInfo: any[], raceData: RaceSimulateData) => {
+        const byFrame: Record<number, { name: string; trainer?: string }> = {};
+        if (raceHorseInfo && raceHorseInfo.length === raceData.horseResult.length) {
+            raceHorseInfo.forEach((d: any) => {
+                const frameOrder = d['frame_order'] - 1;
+                const charaId = d['chara_id'];
+                const name = charaId in UMDatabaseWrapper.charas
+                    ? UMDatabaseWrapper.charas[charaId].name
+                    : unknownCharaTag;
+                const trainer = d['trainer_name'] ? String(d['trainer_name']) : undefined;
+                byFrame[frameOrder] = { name, trainer };
+            });
+        }
+
+        const options: { frameOrder: number; label: string }[] = [];
+        for (let frameOrder = 0; frameOrder < raceData.horseResult.length; frameOrder++) {
+            const gate = frameOrder + 1;
+            const info = byFrame[frameOrder];
+            const name = info?.name ?? unknownCharaTag;
+            const trainerSuffix = info?.trainer ? ` [${info.trainer}]` : '';
+            options.push({ frameOrder, label: `#${gate} ${name}${trainerSuffix}` });
+        }
+        return options;
+    });
+
     skillActivations = memoize((raceData: RaceSimulateData) => {
         const allSkillActivations: Record<number, { time: number; name: string; param: number[] }[]> = {};
         for (let i = 0; i < raceData.horseResult.length; i++) {
@@ -168,11 +194,10 @@ class RaceDataPresenter extends React.PureComponent<RaceDataPresenterProps, Race
                         <Form.Control as="select"
                             onChange={(e) => this.setState({ selectedCharaFrameOrder: e.target.value ? parseInt(e.target.value) : undefined })}>
                             <option value="">Select Character</option>
-                            {Object.entries(this.displayNames(this.props.raceHorseInfo, this.props.raceData))
-                                .sort(([, a], [, b]) => a.localeCompare(b))
-                                .map(([frameOrder, displayName]) => {
-                                    return <option key={frameOrder} value={frameOrder}>{displayName}</option>;
-                                })}
+                            {this.charaSelectOptions(this.props.raceHorseInfo, this.props.raceData)
+                                .map(({ frameOrder, label }) => (
+                                    <option key={frameOrder} value={frameOrder}>{label}</option>
+                                ))}
                         </Form.Control>
                         <Form.Switch
                             checked={this.state.showSkills}
