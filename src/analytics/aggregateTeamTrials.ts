@@ -24,6 +24,11 @@ import { buildUmaFingerprint } from './umaIdentity';
 import { aggregateScoreBreakdown } from './scoreBreakdown';
 import { buildStyleSaturation } from './styleSaturation';
 import { DISTANCE_LABELS, DISTANCE_ORDER, STRATEGY_LABELS } from './types';
+import {
+    rawRoundTeamScore,
+    rawSessionTeamScore,
+    roundSupportCardBonusScore,
+} from '../utils/teamTrialScore';
 
 type AggregateOptions = { buildKey?: string; distanceType?: number; scoreBonuses?: ScoreBonusSettings };
 
@@ -300,11 +305,6 @@ function buildMatchups(
     }));
 }
 
-function bonusMultiplier(supportCardBonus: number): number {
-    const pct = supportCardBonus / 100;
-    return pct > 0 ? 1 + pct / 100 : 1;
-}
-
 function scoreBonuses(options?: AggregateOptions): ScoreBonusSettings {
     return options?.scoreBonuses ?? DEFAULT_SCORE_BONUSES;
 }
@@ -336,6 +336,10 @@ function allMembersPlacedScore(round: TTRound, bonuses: ScoreBonusSettings): num
     return round.teamScoreEvents
         .filter((event) => TEAM_PLACEMENT_SCORE_IDS.has(event.rawScoreId))
         .reduce((sum, event) => sum + scoreEventDisplayScore(event, bonuses), 0);
+}
+
+function roundOverallScore(round: TTRound, includeSupportCardBonus: boolean): number {
+    return rawRoundTeamScore(round) - (includeSupportCardBonus ? 0 : roundSupportCardBonusScore(round));
 }
 
 function roundPlayerScore(
@@ -589,7 +593,8 @@ function sessionAggregateScore(session: TTSession, options?: AggregateOptions): 
         }
         return 0;
     }
-    return session.rounds.reduce((sum, r) => sum + r.teamTotalScore, 0);
+    const includeSupportCardBonus = scoreBonuses(options).supportCard;
+    return session.rounds.reduce((sum, round) => sum + roundOverallScore(round, includeSupportCardBonus), 0);
 }
 
 export function aggregateStats(
@@ -623,9 +628,9 @@ export function aggregateStats(
     const teamScores = rounds.map((r) => (
         options?.distanceType !== undefined || options?.buildKey !== undefined
             ? roundPlayerScore(r, bonuses, options?.buildKey, options?.distanceType !== undefined && options?.buildKey === undefined)
-            : r.teamTotalScore
+            : roundOverallScore(r, bonuses.supportCard)
     ));
-    const rawTeamScores = rounds.map((r) => r.teamTotalScore);
+    const rawTeamScores = rounds.map(rawRoundTeamScore);
     const wins = placements.filter((p) => p === 1).length;
     const top2 = placements.filter((p) => p <= 2).length;
     const top3 = placements.filter((p) => p <= 3).length;
@@ -685,12 +690,7 @@ export function aggregateStats(
             : undefined);
     const rosterUpdatesBySessionId = buildRosterUpdatesBySessionId(sessions, rosterScopeDistance);
     const sessionScoreTotals = filteredSessions.map((s) => sessionAggregateScore(s, options));
-    const sessionScoreTotalsNormalized = filteredSessions.map((s) => {
-        const score = sessionAggregateScore(s, options);
-        return options?.buildKey !== undefined || options?.distanceType !== undefined
-            ? score
-            : score / bonusMultiplier(s.supportCardBonus);
-    });
+    const rawSessionScoreTotals = filteredSessions.map((s) => rawSessionTeamScore(s.rounds));
 
     const sessionWins = filteredSessions.filter((s) => {
         if (options?.distanceType !== undefined) {
@@ -769,7 +769,7 @@ export function aggregateStats(
         placement: summarize(placements),
         score: summarize(scores),
         raceScoreTotal: summarize(sessionScoreTotals),
-        raceScoreTotalNormalized: summarize(sessionScoreTotalsNormalized),
+        raceScoreTotalRaw: summarize(rawSessionScoreTotals),
         teamScore: summarize(teamScores),
         teamScoreRaw: summarize(rawTeamScores),
         winRate: placements.length > 0 ? wins / placements.length : 0,
@@ -890,7 +890,12 @@ export function aggregateStats(
 }
 
 export function aggregateOverall(sessions: TTSession[], scoreBonuses?: ScoreBonusSettings): AggregatedStats {
-    return aggregateStats(sessions, { scoreBonuses });
+    return aggregateStats(sessions, {
+        scoreBonuses: {
+            ...DEFAULT_SCORE_BONUSES,
+            supportCard: scoreBonuses?.supportCard === true,
+        },
+    });
 }
 
 export function aggregateByUma(sessions: TTSession[], buildKey: string, scoreBonuses?: ScoreBonusSettings): AggregatedStats {

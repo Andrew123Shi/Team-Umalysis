@@ -100,11 +100,23 @@ export default function SettingsPage() {
             <div className="settings-card mt-3">
                 <SectionHeading level="section" title="Settings: Score Bonuses" className="mt-0" />
 
-                <p className="text-muted">
-                    Choose which bonuses are included in uma- and distance-level score analytics.
+                <p className="text-muted mb-2">
+                    Choose which bonuses are included in score analytics.
                     Changes apply immediately and are saved in this browser.
                 </p>
 
+                <Form.Check
+                    type="checkbox"
+                    id="score-bonus-support-card"
+                    checked={scoreBonuses.supportCard}
+                    onChange={(e) => setScoreBonusEnabled('supportCard', e.target.checked)}
+                    label="Support Card Bonus"
+                    className="mb-0"
+                />
+
+                <Form.Text className="d-block text-muted fst-italic my-1">
+                    Applies to Uma and Distance Analysis only:
+                </Form.Text>
                 <Form.Check
                     type="checkbox"
                     id="score-bonus-ace"
@@ -125,19 +137,12 @@ export default function SettingsPage() {
                     checked={scoreBonuses.streak}
                     onChange={(e) => setScoreBonusEnabled('streak', e.target.checked)}
                     label="Streak Bonus"
-                />
-                <Form.Check
-                    type="checkbox"
-                    id="score-bonus-support-card"
-                    checked={scoreBonuses.supportCard}
-                    onChange={(e) => setScoreBonusEnabled('supportCard', e.target.checked)}
-                    label="Support Card Bonus"
+                    className="mb-2"
                 />
 
-                <Form.Text className="d-block text-muted mt-2">
-                    With all options off, uma analytics use base score and distance analytics also
-                    include the All Members Placed score. Overall team score remains the in-game
-                    total; its score chart has a separate bonus-normalized view.
+                <Form.Text className="d-block text-muted mt-0">
+                    With all options off, Distance Analysis includes the All Members Placed bonus
+                    while Uma Analysis uses base score only.
                 </Form.Text>
             </div>
         </Container>

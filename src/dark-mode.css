@@ -2103,13 +2103,17 @@ body {
   padding-bottom: 0.35rem;
 }
 
+.trend-heading-with-controls {
+  min-height: calc(1.5em + 0.5rem + 2px);
+}
+
 .win-rate-trend-chart-controls {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 0.35rem;
-  margin-bottom: 0.15rem;
+  margin-bottom: 0;
 }
 
 .win-rate-trend-full-scale-row {

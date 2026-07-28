@@ -287,7 +287,7 @@ export type AggregatedStats = {
     placement: NumericSummary;
     score: NumericSummary;
     raceScoreTotal: NumericSummary;
-    raceScoreTotalNormalized: NumericSummary;
+    raceScoreTotalRaw: NumericSummary;
     teamScore: NumericSummary;
     teamScoreRaw: NumericSummary;
     winRate: number;

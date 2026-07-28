@@ -25,11 +25,6 @@ function sotrEmaLabel(period: number): string {
     return `SOTR EMA ${Math.max(1, Math.floor(period))}`;
 }
 
-function bonusMultiplier(rawBonus: number): number {
-    const pct = rawBonus / 100;
-    return pct > 0 ? 1 + pct / 100 : 1;
-}
-
 function snapRatingYRange(...series: number[][]): { min: number; max: number } {
     const values = series.flat().filter((v) => Number.isFinite(v));
     if (values.length === 0) return { min: 0, max: RATING_Y_STEP };
@@ -160,8 +155,7 @@ function buildRosterMarkLine(
 
 function sotrRatio(point: AggregatedStats['scoreTrend'][number]): number | null {
     if (point.selfTeamRating <= 0) return null;
-    const normalizedScore = point.teamScore / bonusMultiplier(point.supportCardBonus);
-    return normalizedScore / point.selfTeamRating;
+    return point.teamScore / point.selfTeamRating;
 }
 
 export default function TeamRatingTrendChart({
@@ -463,9 +457,9 @@ export default function TeamRatingTrendChart({
 
     return (
         <div>
-            <SectionHeading title="Team Rating Progression" compact className="mt-0 is-tight-below" />
-            <div className="d-flex flex-wrap align-items-center justify-content-end gap-2 mb-2">
-                <div className="d-flex align-items-center gap-2">
+            <div className="position-relative trend-heading-with-controls">
+                <SectionHeading title="Team Rating Progression" compact className="mt-0 pb-0" />
+                <div className="position-absolute top-0 end-0 d-flex align-items-center gap-2">
                     <Form.Label className="text-secondary small mb-0">EMA Period</Form.Label>
                     <Form.Control
                         type="number"

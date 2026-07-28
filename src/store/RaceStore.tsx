@@ -8,6 +8,7 @@ import {
     pickFolderAndLoadSessions,
     type DataSource,
 } from '../data/raceLoader';
+import { rawSessionTeamScore } from '../utils/teamTrialScore';
 
 const TRAINER_OVERRIDE_KEY = 'team-umalysis-trainer-name-override';
 const DEBUG_MODE_KEY = 'team-umalysis-debug-mode';
@@ -115,7 +116,7 @@ function buildIndexEntry(session: TTSession): SessionIndexEntry {
         playerTrainerName: session.playerTrainerName,
         opponentTrainerName: getSessionOpponentTrainer(session),
         supportCardBonus: session.supportCardBonus,
-        totalTeamScore: session.rounds.reduce((sum, r) => sum + r.teamTotalScore, 0),
+        totalTeamScore: rawSessionTeamScore(session.rounds),
         roundsWon: session.rounds.filter((r) => r.playerWonRound).length,
         roundCount: session.rounds.length,
         opponentEvaluate: session.rounds[0]?.opponentEvaluate ?? 0,

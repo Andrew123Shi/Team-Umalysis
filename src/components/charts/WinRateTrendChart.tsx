@@ -435,7 +435,7 @@ export default function WinRateTrendChart({
 
     return (
         <div className="win-rate-trend-chart">
-            <SectionHeading title="Win Rate Progression" compact className="mt-0 is-tight-below" />
+            <SectionHeading title="Win Rate Progression" compact className="mt-0 pb-0" />
             <div className="win-rate-trend-chart-controls">
                 <div className="win-rate-trend-full-scale-row">
                     <label

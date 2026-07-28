@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import ReactECharts from 'echarts-for-react';
-import { Button, ButtonGroup, Form } from 'react-bootstrap';
+import { Form } from 'react-bootstrap';
 import type { AggregatedStats, RosterChangeUma, RosterUpdate } from '../../analytics/types';
 import type { StatCardViewMode } from './StatCards';
 import { type LegendSelectChangedEvent } from './chartLegendScale';
@@ -13,8 +13,6 @@ import { chartTooltipStyle } from './chartTooltip';
 import { CHART_UPDATE_ANIMATION } from './chartLayout';
 import SectionHeading from '../SectionHeading';
 import { useRaceStore } from '../../store/RaceStore';
-
-type ScoreMode = 'normalized' | 'raw';
 
 type ScoreLegendKey = 'score' | 'ema' | 'segmentAvg' | 'bonus';
 type ScoreLegendSelection = Partial<Record<ScoreLegendKey, boolean>>;
@@ -55,11 +53,6 @@ function fromEchartsLegendSelected(
 
 function bonusPercent(rawBonus: number): number {
     return rawBonus / 100;
-}
-
-function bonusMultiplier(rawBonus: number): number {
-    const pct = bonusPercent(rawBonus);
-    return pct > 0 ? 1 + pct / 100 : 1;
 }
 
 const SCORE_Y_STEP = 10_000;
@@ -208,7 +201,6 @@ export default function ScoreTrendChart({
     viewMode?: StatCardViewMode;
 }) {
     const { debugMode } = useRaceStore();
-    const [mode, setMode] = useState<ScoreMode>('raw');
     const [emaPeriod, setEmaPeriod] = useState(50);
     const [legendSelected, setLegendSelected] = useState<ScoreLegendSelection>({});
 
@@ -216,7 +208,6 @@ export default function ScoreTrendChart({
     const formattedDates = useMemo(() => dates.map(formatChartDate), [dates]);
     const trendKeys = useMemo(() => stats.scoreTrend.map((d) => d.fileName), [stats.scoreTrend]);
     const rawScores = stats.scoreTrend.map((d) => d.teamScore);
-    const normalizedScores = stats.scoreTrend.map((d) => d.teamScore / bonusMultiplier(d.supportCardBonus));
     const bonusValues = stats.scoreTrend.map((d) => bonusPercent(d.supportCardBonus));
 
     const sourceKeys = useMemo(
@@ -227,18 +218,10 @@ export default function ScoreTrendChart({
         () => emaSourceTrend?.map((d) => d.teamScore),
         [emaSourceTrend],
     );
-    const sourceNormalizedScores = useMemo(
-        () => emaSourceTrend?.map((d) => d.teamScore / bonusMultiplier(d.supportCardBonus)),
-        [emaSourceTrend],
-    );
 
     const rawEma = useMemo(
         () => emaForVisibleWindow(rawScores, trendKeys, sourceRawScores, sourceKeys, emaPeriod),
         [rawScores, trendKeys, sourceRawScores, sourceKeys, emaPeriod],
-    );
-    const normalizedEma = useMemo(
-        () => emaForVisibleWindow(normalizedScores, trendKeys, sourceNormalizedScores, sourceKeys, emaPeriod),
-        [normalizedScores, trendKeys, sourceNormalizedScores, sourceKeys, emaPeriod],
     );
 
     const isDistanceView = viewMode === 'distance';
@@ -255,12 +238,8 @@ export default function ScoreTrendChart({
         [rosterUpdateMarkLines],
     );
 
-    const activeScores = isScopedScoreView
-        ? rawScores
-        : (mode === 'normalized' ? normalizedScores : rawScores);
-    const activeEma = isScopedScoreView
-        ? rawEma
-        : (mode === 'normalized' ? normalizedEma : rawEma);
+    const activeScores = rawScores;
+    const activeEma = rawEma;
     const activeSegmentAvg = useMemo(
         () => segmentAverage(activeScores, rosterBoundaryIndices),
         [activeScores, rosterBoundaryIndices],
@@ -270,8 +249,6 @@ export default function ScoreTrendChart({
     const emaLabel = `EMA ${Math.max(1, Math.floor(emaPeriod))}`;
     const scoreName = isScopedScoreView
         ? (isDistanceView ? 'Race Score' : 'Score')
-        : mode === 'normalized'
-        ? (isDistanceView ? 'Normalized Race Score' : 'Normalized Score')
         : (isDistanceView ? 'Race Score' : 'Total Score');
     const showBonusChart = !isScopedScoreView;
     const gridLeft = 82;
@@ -610,26 +587,9 @@ export default function ScoreTrendChart({
 
     return (
         <div>
-            <SectionHeading title="Score Progression" compact className="mt-0" />
-            <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
-                {!isScopedScoreView && (
-                <ButtonGroup size="sm">
-                    <Button
-                        variant={mode === 'raw' ? 'secondary' : 'outline-secondary'}
-                        onClick={() => setMode('raw')}
-                    >
-                        Raw Score
-                    </Button>
-                    <Button
-                        variant={mode === 'normalized' ? 'secondary' : 'outline-secondary'}
-                        onClick={() => setMode('normalized')}
-                    >
-                        Bonus Normalized
-                    </Button>
-                </ButtonGroup>
-                )}
-                {isScopedScoreView && <div />}
-                <div className="d-flex align-items-center gap-2">
+            <div className="position-relative trend-heading-with-controls">
+                <SectionHeading title="Score Progression" compact className="mt-0 pb-0" />
+                <div className="position-absolute top-0 end-0 d-flex align-items-center gap-2">
                     <Form.Label className="text-secondary small mb-0">EMA Period</Form.Label>
                     <Form.Control
                         type="number"

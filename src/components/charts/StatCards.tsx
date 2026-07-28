@@ -290,11 +290,13 @@ function AverageTotalScoreCard({
     return (
         <ScoreSummary
             title="Average Total Score"
-            avg={stats.raceScoreTotalNormalized.avg}
-            median={stats.raceScoreTotalNormalized.median}
-            min={stats.raceScoreTotalNormalized.min}
-            max={stats.raceScoreTotalNormalized.max}
-            rawAvg={stats.raceScoreTotal.avg}
+            avg={stats.raceScoreTotal.avg}
+            median={stats.raceScoreTotal.median}
+            min={stats.raceScoreTotal.min}
+            max={stats.raceScoreTotal.max}
+            rawAvg={stats.raceScoreTotalRaw.avg !== stats.raceScoreTotal.avg
+                ? stats.raceScoreTotalRaw.avg
+                : undefined}
             compact={compact}
         />
     );
