@@ -25,7 +25,44 @@ RANK_DATA_SRC = ROOT / "src" / "data" / "team_stadium_rank.json"
 
 DB_BASE_KEY = b"\xF1\x70\xCE\xA4\xDF\xCE\xA3\xE1\xA5\xD8\xC7\x0B\xD1\x00\x00\x00"
 JP_DB_KEY = b"\x6D\x5B\x65\x33\x63\x36\x63\x25\x54\x71\x2D\x73\x50\x53\x63\x38\x6D\x34\x37\x7B\x35\x63\x70\x23\x37\x34\x53\x29\x73\x43\x36\x33"
-GLOBAL_DB_KEY = bytes([0x56, 0x63, 0x6B, 0x63, 0x42, 0x72, 0x37, 0x76, 0x65, 0x70, 0x41, 0x62])
+# Matches UmaViewer Config.GlobalDBKey (Steam Global meta encryption).
+GLOBAL_DB_KEY = bytes(
+    [
+        0x36,
+        0x23,
+        0x6B,
+        0x4C,
+        0x2A,
+        0x39,
+        0x21,
+        0x75,
+        0x52,
+        0x26,
+        0x32,
+        0x76,
+        0x25,
+        0x50,
+        0x3F,
+        0x35,
+        0x5D,
+        0x77,
+        0x58,
+        0x6D,
+        0x40,
+        0x71,
+        0x38,
+        0x5E,
+        0x4C,
+        0x31,
+        0x28,
+        0x74,
+        0x29,
+        0x59,
+        0x37,
+        0x24,
+        0x53,
+    ]
+)
 AB_KEY = b"\x53\x2B\x46\x31\xE4\xA7\xB9\x47\x3E\x7C\xFB"
 
 ASSET_QUERY = """

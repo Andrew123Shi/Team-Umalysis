@@ -1,5 +1,5 @@
 {
-  "version": "2026-07-23",
+  "version": "2026-08-02",
   "chara": [
     {
       "id": 1001,
@@ -15636,6 +15636,32 @@
       "iconId": 20023
     },
     {
+      "id": 110351,
+      "name": "Ticket to Your Dreams!",
+      "gradeValue": 340,
+      "tagId": [
+        "401"
+      ],
+      "rarity": 5,
+      "conditionGroups": [
+        {
+          "condition": "is_lastspurt==1&is_finalcorner==1&corner==0&order_rate>=40",
+          "baseTime": 60000,
+          "effects": [
+            {
+              "type": 27,
+              "value": 2500
+            },
+            {
+              "type": 27,
+              "value": 500
+            }
+          ]
+        }
+      ],
+      "iconId": 20013
+    },
+    {
       "id": 110371,
       "name": "Guten Appetit ♪",
       "gradeValue": 340,
@@ -15769,6 +15795,28 @@
             {
               "type": 27,
               "value": 2500
+            }
+          ]
+        }
+      ],
+      "iconId": 20013
+    },
+    {
+      "id": 110501,
+      "name": "Hephaestus",
+      "gradeValue": 340,
+      "tagId": [
+        "401"
+      ],
+      "rarity": 5,
+      "conditionGroups": [
+        {
+          "condition": "phase>=2&is_finalcorner_laterhalf==1&order_rate<=75&order_rate>=40",
+          "baseTime": 50000,
+          "effects": [
+            {
+              "type": 27,
+              "value": 3500
             }
           ]
         }
@@ -26301,6 +26349,62 @@
       "iconId": 20011
     },
     {
+      "id": 202391,
+      "name": "Givin' It 1000%",
+      "gradeValue": 508,
+      "tagId": [
+        "101",
+        "302",
+        "401"
+      ],
+      "rarity": 2,
+      "conditionGroups": [
+        {
+          "condition": "phase_firsthalf_random==1&running_style==1",
+          "baseTime": 27000,
+          "effects": [
+            {
+              "type": 27,
+              "value": 4500
+            },
+            {
+              "type": 9,
+              "value": -400
+            }
+          ]
+        }
+      ],
+      "iconId": 20012
+    },
+    {
+      "id": 202392,
+      "name": "Mad Dash",
+      "gradeValue": 217,
+      "tagId": [
+        "101",
+        "302",
+        "401"
+      ],
+      "rarity": 1,
+      "conditionGroups": [
+        {
+          "condition": "phase_firsthalf_random==1&running_style==1",
+          "baseTime": 27000,
+          "effects": [
+            {
+              "type": 27,
+              "value": 2500
+            },
+            {
+              "type": 9,
+              "value": -400
+            }
+          ]
+        }
+      ],
+      "iconId": 20011
+    },
+    {
       "id": 202401,
       "name": "Flash Forward",
       "gradeValue": 508,
@@ -29764,6 +29868,32 @@
       "iconId": 20021
     },
     {
+      "id": 910351,
+      "name": "Ticket to Your Dreams!",
+      "gradeValue": 180,
+      "tagId": [
+        "401"
+      ],
+      "rarity": 1,
+      "conditionGroups": [
+        {
+          "condition": "is_lastspurt==1&is_finalcorner==1&corner==0&order_rate>=40",
+          "baseTime": 36000,
+          "effects": [
+            {
+              "type": 27,
+              "value": 500
+            },
+            {
+              "type": 27,
+              "value": 500
+            }
+          ]
+        }
+      ],
+      "iconId": 20011
+    },
+    {
       "id": 910371,
       "name": "Guten Appetit ♪",
       "gradeValue": 180,
@@ -29897,6 +30027,28 @@
             {
               "type": 27,
               "value": 500
+            }
+          ]
+        }
+      ],
+      "iconId": 20011
+    },
+    {
+      "id": 910501,
+      "name": "Hephaestus",
+      "gradeValue": 180,
+      "tagId": [
+        "401"
+      ],
+      "rarity": 1,
+      "conditionGroups": [
+        {
+          "condition": "phase>=2&is_finalcorner_laterhalf==1&order_rate<=75&order_rate>=40",
+          "baseTime": 30000,
+          "effects": [
+            {
+              "type": 27,
+              "value": 1500
             }
           ]
         }
@@ -33670,6 +33822,45 @@
       "id": 30110,
       "name": "[It's on the House] Manhattan Cafe",
       "charaId": 1025,
+      "raceBonus": 1,
+      "raceBonusByLimitBreak": [
+        0,
+        1,
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": 30111,
+      "name": "[Teio-Oo-Oo!!!] Tokai Teio",
+      "charaId": 1003,
+      "raceBonus": 1,
+      "raceBonusByLimitBreak": [
+        0,
+        1,
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": 30112,
+      "name": "[TT Ignition!] Twin Turbo",
+      "charaId": 1066,
+      "raceBonus": 0,
+      "raceBonusByLimitBreak": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": 30113,
+      "name": "[Uchronia Architect] Biwa Hayahide",
+      "charaId": 1023,
       "raceBonus": 1,
       "raceBonusByLimitBreak": [
         0,
@@ -46722,6 +46913,20 @@
       "solvableType": 0
     },
     {
+      "id": 202391,
+      "needSkillPoint": 180,
+      "statusType": 0,
+      "statusValue": 0,
+      "solvableType": 0
+    },
+    {
+      "id": 202392,
+      "needSkillPoint": 180,
+      "statusType": 0,
+      "statusValue": 0,
+      "solvableType": 0
+    },
+    {
       "id": 202401,
       "needSkillPoint": 180,
       "statusType": 0,
@@ -47576,6 +47781,13 @@
       "solvableType": 0
     },
     {
+      "id": 910351,
+      "needSkillPoint": 200,
+      "statusType": 0,
+      "statusValue": 0,
+      "solvableType": 0
+    },
+    {
       "id": 910371,
       "needSkillPoint": 200,
       "statusType": 0,
@@ -47605,6 +47817,13 @@
     },
     {
       "id": 910461,
+      "needSkillPoint": 200,
+      "statusType": 0,
+      "statusValue": 0,
+      "solvableType": 0
+    },
+    {
+      "id": 910501,
       "needSkillPoint": 200,
       "statusType": 0,
       "statusValue": 0,

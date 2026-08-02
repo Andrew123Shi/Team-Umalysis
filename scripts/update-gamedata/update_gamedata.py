@@ -54,13 +54,27 @@ def write_json(path: Path, value) -> None:
         handle.write("\n")
 
 
-def update_skills(cursor: sqlite3.Cursor) -> int:
+def print_change_lines(label: str, lines: list[str], limit: int = 40) -> None:
+    if not lines:
+        print(f"  {label}: none")
+        return
+    print(f"  {label}: {len(lines)}")
+    for line in lines[:limit]:
+        print(f"    - {line}")
+    remaining = len(lines) - limit
+    if remaining > 0:
+        print(f"    ... and {remaining} more")
+
+
+def update_skills(cursor: sqlite3.Cursor) -> tuple[int, list[str], list[str]]:
     existing_list = [
         entry
         for entry in load_json(SKILLS_PATH, [])
         if isinstance(entry, dict) and "id" in entry
     ]
     existing = {entry["id"]: entry for entry in existing_list}
+    added: list[str] = []
+    changed: list[str] = []
 
     cursor.execute(
         """
@@ -73,22 +87,27 @@ def update_skills(cursor: sqlite3.Cursor) -> int:
 
     for row in cursor.fetchall():
         skill_id = row["id"]
+        enname = row["enname"]
         prior = existing.get(skill_id)
         if prior is None:
             existing[skill_id] = {
                 "id": skill_id,
-                "enname": row["enname"],
-                "jpname": row["enname"],
+                "enname": enname,
+                "jpname": enname,
             }
+            added.append(f"{skill_id}: {enname}")
         else:
-            prior["enname"] = row["enname"]
+            old_name = prior.get("enname", "")
+            if old_name != enname:
+                changed.append(f"{skill_id}: {old_name!r} -> {enname!r}")
+            prior["enname"] = enname
 
     skills = [existing[skill_id] for skill_id in sorted(existing)]
     write_json(SKILLS_PATH, skills)
-    return len(skills)
+    return len(skills), added, changed
 
 
-def update_tracknames(cursor: sqlite3.Cursor) -> int:
+def update_tracknames(cursor: sqlite3.Cursor) -> tuple[int, list[str], list[str]]:
     existing = load_json(TRACKNAMES_PATH, {})
     cursor.execute(
         """
@@ -99,24 +118,39 @@ def update_tracknames(cursor: sqlite3.Cursor) -> int:
         """
     )
     tracknames = dict(existing)
+    added: list[str] = []
+    changed: list[str] = []
     for row in cursor.fetchall():
         track_id = str(row["id"])
-        prior = existing.get(track_id, ["", ""])
+        prior = existing.get(track_id)
         japanese = prior[0] if isinstance(prior, list) and len(prior) > 0 else ""
-        english = row["short_name"] or (prior[1] if isinstance(prior, list) and len(prior) > 1 else "")
-        tracknames[track_id] = [japanese, english]
+        english = row["short_name"] or (
+            prior[1] if isinstance(prior, list) and len(prior) > 1 else ""
+        )
+        next_value = [japanese, english]
+        if prior is None:
+            added.append(f"{track_id}: {english or japanese or '(unnamed)'}")
+        elif prior != next_value:
+            old_english = prior[1] if isinstance(prior, list) and len(prior) > 1 else ""
+            changed.append(f"{track_id}: {old_english!r} -> {english!r}")
+        tracknames[track_id] = next_value
     write_json(TRACKNAMES_PATH, tracknames)
-    return len(tracknames)
+    return len(tracknames), added, changed
 
 
-def update_course_data(db_path: str) -> bool:
+def update_course_data(db_path: str) -> tuple[int, list[str], list[str], list[str]]:
     existing = load_json(COURSE_DATA_PATH, {})
     course_data, warnings = build_course_data(db_path, existing)
+    added: list[str] = []
+    changed: list[str] = []
+    for course_id, course in course_data.items():
+        prior = existing.get(course_id)
+        if prior is None:
+            added.append(str(course_id))
+        elif prior != course:
+            changed.append(str(course_id))
     write_json(COURSE_DATA_PATH, course_data)
-    print(f"Updated tracks/course_data ({len(course_data)} courses)")
-    for warning in warnings:
-        print(f"  warning: {warning}")
-    return True
+    return len(course_data), added, changed, warnings
 
 
 def main() -> int:
@@ -140,11 +174,33 @@ def main() -> int:
     )
 
     cursor = open_cursor(db_path)
-    skill_count = update_skills(cursor)
-    track_count = update_tracknames(cursor)
-    print(f"Updated skills ({skill_count}) and tracknames ({track_count})")
+    skill_count, skills_added, skills_changed = update_skills(cursor)
+    track_count, tracks_added, tracks_changed = update_tracknames(cursor)
+    course_count, courses_added, courses_changed, warnings = update_course_data(db_path)
 
-    update_course_data(db_path)
+    print()
+    print("=== Gamedata update summary ===")
+    print(f"skills.json: {skill_count} total")
+    print_change_lines("added", skills_added)
+    print_change_lines("changed", skills_changed)
+    print(f"tracknames.json: {track_count} total")
+    print_change_lines("added", tracks_added)
+    print_change_lines("changed", tracks_changed)
+    print(f"course_data.json: {course_count} total")
+    print_change_lines("added", courses_added)
+    print_change_lines("changed", courses_changed)
+    if warnings:
+        print(f"  warnings: {len(warnings)}")
+        for warning in warnings:
+            print(f"    - {warning}")
+    else:
+        print("  warnings: none")
+
+    any_changes = any(
+        (skills_added, skills_changed, tracks_added, tracks_changed, courses_added, courses_changed)
+    )
+    if not any_changes:
+        print("No gamedata asset content changes detected.")
     return 0
 
 
