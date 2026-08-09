@@ -4,6 +4,13 @@ import type { TTSession } from '../analytics/types';
 const DB_NAME = 'team-umalysis';
 const DB_VERSION = 1;
 const HANDLE_STORE = 'directory-handles';
+/** Max concurrent file read+parse tasks on the main thread. */
+const LOAD_CONCURRENCY = 2;
+/**
+ * Newest N files are parsed first so Recent (100) views can render before
+ * older sessions finish loading in the background.
+ */
+export const PRIORITY_SESSION_LOAD_COUNT = 100;
 
 export type DataSource = 'folder';
 export type FolderLoadResult = {
@@ -12,10 +19,44 @@ export type FolderLoadResult = {
     sessions: TTSession[];
 };
 
+export type SessionLoadHandlers = {
+    onProgress?: (loaded: number, total: number) => void;
+    /**
+     * Fired once after the newest {@link PRIORITY_SESSION_LOAD_COUNT} sessions
+     * are ready, only when older files still remain to load.
+     */
+    onPriorityReady?: (partial: FolderLoadResult) => void;
+};
+
 type LoadedSessions = {
     latestFileName: string;
     sessions: TTSession[];
 };
+
+type NamedFile = { name: string; file: File };
+
+/** Run `fn` over `items` with at most `concurrency` tasks in flight. Results keep input order. */
+async function mapPool<T, R>(
+    items: T[],
+    concurrency: number,
+    fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+    const results = new Array<R>(items.length);
+    let nextIndex = 0;
+
+    async function worker() {
+        while (true) {
+            const i = nextIndex;
+            nextIndex += 1;
+            if (i >= items.length) return;
+            results[i] = await fn(items[i]);
+        }
+    }
+
+    const workerCount = Math.min(Math.max(1, concurrency), items.length);
+    await Promise.all(Array.from({ length: workerCount }, () => worker()));
+    return results;
+}
 
 function openDb(): Promise<IDBDatabase> {
     return new Promise((resolve, reject) => {
@@ -59,7 +100,7 @@ async function loadDirectoryHandle(): Promise<FileSystemDirectoryHandle | null> 
 }
 
 export async function pickFolderAndLoadSessions(
-    onProgress?: (loaded: number, total: number) => void,
+    handlers: SessionLoadHandlers = {},
     onFolderSelected?: () => void,
 ): Promise<FolderLoadResult> {
     if (!('showDirectoryPicker' in window)) {
@@ -68,7 +109,7 @@ export async function pickFolderAndLoadSessions(
     const handle = await window.showDirectoryPicker({ mode: 'read' });
     onFolderSelected?.();
     await saveDirectoryHandle(handle);
-    const loaded = await loadSessionsFromHandle(handle, onProgress);
+    const loaded = await loadSessionsFromHandle(handle, handlers);
     return {
         folderName: handle.name,
         latestFileName: loaded.latestFileName,
@@ -77,7 +118,7 @@ export async function pickFolderAndLoadSessions(
 }
 
 export async function loadSessionsFromSavedFolder(
-    onProgress?: (loaded: number, total: number) => void,
+    handlers: SessionLoadHandlers = {},
 ): Promise<FolderLoadResult | null> {
     const handle = await loadDirectoryHandle();
     if (!handle) return null;
@@ -87,7 +128,7 @@ export async function loadSessionsFromSavedFolder(
             const req = await handle.requestPermission({ mode: 'read' });
             if (req !== 'granted') return null;
         }
-        const loaded = await loadSessionsFromHandle(handle, onProgress);
+        const loaded = await loadSessionsFromHandle(handle, handlers);
         return {
             folderName: handle.name,
             latestFileName: loaded.latestFileName,
@@ -98,28 +139,66 @@ export async function loadSessionsFromSavedFolder(
     }
 }
 
+async function parseSessionFiles(
+    files: NamedFile[],
+    totalFiles: number,
+    progress: { loaded: number },
+    onProgress?: (loaded: number, total: number) => void,
+): Promise<TTSession[]> {
+    if (files.length === 0) return [];
+    const outcomes = await mapPool(files, LOAD_CONCURRENCY, async ({ name, file }) => {
+        const text = await file.text();
+        const json = JSON.parse(text);
+        const session = parseTeamTrialSession(json, name);
+        progress.loaded += 1;
+        onProgress?.(progress.loaded, totalFiles);
+        return 'error' in session ? null : session;
+    });
+    return outcomes.filter((session): session is TTSession => session !== null);
+}
+
 async function loadSessionsFromHandle(
     handle: FileSystemDirectoryHandle,
-    onProgress?: (loaded: number, total: number) => void,
+    handlers: SessionLoadHandlers = {},
 ): Promise<LoadedSessions> {
-    const files: { name: string; file: File }[] = [];
+    const { onProgress, onPriorityReady } = handlers;
+    const files: NamedFile[] = [];
     for await (const entry of handle.values()) {
         if (entry.kind === 'file' && /^TT-.*\.json$/i.test(entry.name)) {
             const file = await entry.getFile();
             files.push({ name: entry.name, file });
         }
     }
+    // Newest first (TT-YYYYMMDD_HHMMSS_… names sort chronologically).
     files.sort((a, b) => b.name.localeCompare(a.name));
     const latestFileName = files[0]?.name ?? '';
-    const parsed: TTSession[] = [];
-    let i = 0;
-    for (const { name, file } of files) {
-        const text = await file.text();
-        const json = JSON.parse(text);
-        const session = parseTeamTrialSession(json, name);
-        if (!('error' in session)) parsed.push(session);
-        i += 1;
-        onProgress?.(i, files.length);
+    const totalFiles = files.length;
+    onProgress?.(0, totalFiles);
+
+    const priorityFiles = files.slice(0, PRIORITY_SESSION_LOAD_COUNT);
+    const remainingFiles = files.slice(PRIORITY_SESSION_LOAD_COUNT);
+    const progress = { loaded: 0 };
+
+    const prioritySessions = await parseSessionFiles(priorityFiles, totalFiles, progress, onProgress);
+
+    if (remainingFiles.length > 0) {
+        onPriorityReady?.({
+            folderName: handle.name,
+            latestFileName,
+            sessions: prioritySessions,
+        });
+        // Let React commit + paint the Recent dashboard before older files burn CPU.
+        await new Promise<void>((resolve) => {
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => resolve());
+            });
+        });
+        const olderSessions = await parseSessionFiles(remainingFiles, totalFiles, progress, onProgress);
+        return {
+            latestFileName,
+            sessions: [...prioritySessions, ...olderSessions],
+        };
     }
-    return { latestFileName, sessions: parsed };
+
+    return { latestFileName, sessions: prioritySessions };
 }

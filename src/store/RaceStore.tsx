@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { ScoreBonusKey, ScoreBonusSettings, SessionIndexEntry, TTSession } from '../analytics/types';
 
@@ -7,6 +7,8 @@ import {
     loadSessionsFromSavedFolder,
     pickFolderAndLoadSessions,
     type DataSource,
+    type FolderLoadResult,
+    type SessionLoadHandlers,
 } from '../data/raceLoader';
 import { rawSessionTeamScore } from '../utils/teamTrialScore';
 
@@ -32,8 +34,9 @@ type RaceStoreValue = {
     lastLoadedAt: Date | null;
     latestFileName: string;
     loading: boolean;
+    /** True after the Recent priority batch while older files are still parsing. */
+    loadingRemaining: boolean;
     hasTriedSavedFolder: boolean;
-    progress: { loaded: number; total: number };
     error: string;
     loadFromFolder: () => Promise<void>;
     reload: () => Promise<void>;
@@ -42,7 +45,14 @@ type RaceStoreValue = {
     setScoreBonusEnabled: (bonus: ScoreBonusKey, enabled: boolean) => void;
 };
 
+type RaceProgressValue = {
+    loading: boolean;
+    loadingRemaining: boolean;
+    progress: { loaded: number; total: number };
+};
+
 const RaceStoreContext = createContext<RaceStoreValue | null>(null);
+const RaceProgressContext = createContext<RaceProgressValue | null>(null);
 
 /** Survives StrictMode remount so auto-load only runs once per page load. */
 let autoLoadStarted = false;
@@ -135,13 +145,29 @@ export function RaceStoreProvider({ children }: { children: React.ReactNode }) {
     const [lastLoadedAt, setLastLoadedAt] = useState<Date | null>(null);
     const [latestFileName, setLatestFileName] = useState('');
     const [loading, setLoading] = useState(false);
+    const [loadingRemaining, setLoadingRemaining] = useState(false);
     const [hasTriedSavedFolder, setHasTriedSavedFolder] = useState(false);
     const [progress, setProgress] = useState({ loaded: 0, total: 0 });
     const [error, setError] = useState('');
+    const loadGenerationRef = useRef(0);
+    const trainerNameOverrideRef = useRef(trainerNameOverride);
+    const progressRafRef = useRef<number | null>(null);
+    const pendingProgressRef = useRef<{ loaded: number; total: number } | null>(null);
+    trainerNameOverrideRef.current = trainerNameOverride;
+
+    const flushProgress = useCallback(() => {
+        progressRafRef.current = null;
+        const pending = pendingProgressRef.current;
+        if (!pending) return;
+        pendingProgressRef.current = null;
+        setProgress(pending);
+    }, []);
 
     const onProgress = useCallback((loaded: number, total: number) => {
-        setProgress({ loaded, total });
-    }, []);
+        pendingProgressRef.current = { loaded, total };
+        if (progressRafRef.current !== null) return;
+        progressRafRef.current = requestAnimationFrame(flushProgress);
+    }, [flushProgress]);
 
     const finalizeSessions = useCallback((parsed: TTSession[], configuredTrainer: string) => {
         const identity = resolvePlayerIdentity(parsed, configuredTrainer);
@@ -150,66 +176,148 @@ export function RaceStoreProvider({ children }: { children: React.ReactNode }) {
         setIndex(parsed.map(buildIndexEntry));
     }, []);
 
-    const loadFromSavedFolder = useCallback(async () => {
+    const applyFolderResult = useCallback((result: FolderLoadResult) => {
+        finalizeSessions(result.sessions, trainerNameOverrideRef.current);
+        setFolderName(result.folderName);
+        setLatestFileName(result.latestFileName);
+        setDataSource('folder');
+    }, [finalizeSessions]);
+
+    const beginLoad = useCallback(() => {
+        const generation = loadGenerationRef.current + 1;
+        loadGenerationRef.current = generation;
+        if (progressRafRef.current !== null) {
+            cancelAnimationFrame(progressRafRef.current);
+            progressRafRef.current = null;
+        }
+        pendingProgressRef.current = null;
         setLoading(true);
+        setLoadingRemaining(false);
         setError('');
         setProgress({ loaded: 0, total: 0 });
+        setSessions([]);
+        setIndex([]);
+        return generation;
+    }, []);
+
+    const endLoad = useCallback((generation: number) => {
+        if (generation !== loadGenerationRef.current) return;
+        if (progressRafRef.current !== null) {
+            cancelAnimationFrame(progressRafRef.current);
+            progressRafRef.current = null;
+        }
+        const pending = pendingProgressRef.current;
+        if (pending) {
+            pendingProgressRef.current = null;
+            setProgress(pending);
+        }
+        setLoadingRemaining(false);
+        setLoading(false);
+    }, []);
+
+    const makeLoadHandlers = useCallback((generation: number): SessionLoadHandlers => ({
+        onProgress: (loaded, total) => {
+            if (generation !== loadGenerationRef.current) return;
+            onProgress(loaded, total);
+        },
+        onPriorityReady: (partial) => {
+            if (generation !== loadGenerationRef.current) return;
+            applyFolderResult(partial);
+            setLoadingRemaining(true);
+            setLastLoadedAt(new Date());
+        },
+    }), [applyFolderResult, onProgress]);
+
+    const finishLoadIfCurrent = useCallback((generation: number, result: FolderLoadResult) => {
+        if (generation !== loadGenerationRef.current) return;
+        applyFolderResult(result);
+        setLastLoadedAt(new Date());
+        setDataSource('folder');
+        setHasTriedSavedFolder(true);
+    }, [applyFolderResult]);
+
+    const loadFromSavedFolder = useCallback(async () => {
+        const generation = beginLoad();
         try {
-            const result = await loadSessionsFromSavedFolder(onProgress);
+            const result = await loadSessionsFromSavedFolder(makeLoadHandlers(generation));
+            if (generation !== loadGenerationRef.current) return;
             if (!result) {
                 setDataSource(null);
                 return;
             }
-            finalizeSessions(result.sessions, trainerNameOverride);
-            setFolderName(result.folderName);
-            setLastLoadedAt(new Date());
-            setLatestFileName(result.latestFileName);
-            setDataSource('folder');
+            finishLoadIfCurrent(generation, result);
         } catch (err: any) {
-            setError(err.message ?? String(err));
+            if (generation === loadGenerationRef.current) {
+                setError(err.message ?? String(err));
+            }
         } finally {
-            setHasTriedSavedFolder(true);
-            setLoading(false);
+            if (generation === loadGenerationRef.current) {
+                setHasTriedSavedFolder(true);
+                endLoad(generation);
+            }
         }
-    }, [onProgress, finalizeSessions, trainerNameOverride]);
+    }, [beginLoad, endLoad, finishLoadIfCurrent, makeLoadHandlers]);
 
     const loadFromFolder = useCallback(async () => {
         setError('');
         setProgress({ loaded: 0, total: 0 });
+        // Generation is assigned only after the user confirms the folder picker.
+        let generation = 0;
+        const handlers: SessionLoadHandlers = {
+            onProgress: (loaded, total) => {
+                if (!generation || generation !== loadGenerationRef.current) return;
+                onProgress(loaded, total);
+            },
+            onPriorityReady: (partial) => {
+                if (!generation || generation !== loadGenerationRef.current) return;
+                applyFolderResult(partial);
+                setLoadingRemaining(true);
+                setLastLoadedAt(new Date());
+            },
+        };
         try {
-            const result = await pickFolderAndLoadSessions(onProgress, () => setLoading(true));
-            finalizeSessions(result.sessions, trainerNameOverride);
-            setFolderName(result.folderName);
-            setLastLoadedAt(new Date());
-            setLatestFileName(result.latestFileName);
-            setDataSource('folder');
-            setHasTriedSavedFolder(true);
+            const result = await pickFolderAndLoadSessions(handlers, () => {
+                generation = beginLoad();
+            });
+            if (!generation || generation !== loadGenerationRef.current) return;
+            finishLoadIfCurrent(generation, result);
         } catch (err: any) {
-            if (!isAbortError(err)) setError(err.message ?? String(err));
+            if (!isAbortError(err) && (!generation || generation === loadGenerationRef.current)) {
+                setError(err.message ?? String(err));
+            }
         } finally {
-            setLoading(false);
+            if (!generation || generation === loadGenerationRef.current) {
+                endLoad(generation || loadGenerationRef.current);
+            }
         }
-    }, [onProgress, finalizeSessions, trainerNameOverride]);
+    }, [applyFolderResult, beginLoad, endLoad, finishLoadIfCurrent, onProgress]);
 
     const reload = useCallback(async () => {
-        setLoading(true);
-        setError('');
-        setProgress({ loaded: 0, total: 0 });
+        const generation = beginLoad();
         try {
-            let result = await loadSessionsFromSavedFolder(onProgress);
-            if (!result) result = await pickFolderAndLoadSessions(onProgress);
-            finalizeSessions(result.sessions, trainerNameOverride);
-            setFolderName(result.folderName);
-            setLastLoadedAt(new Date());
-            setLatestFileName(result.latestFileName);
-            setDataSource('folder');
-            setHasTriedSavedFolder(true);
+            let result = await loadSessionsFromSavedFolder(makeLoadHandlers(generation));
+            if (generation !== loadGenerationRef.current) return;
+            if (!result) {
+                result = await pickFolderAndLoadSessions(
+                    makeLoadHandlers(generation),
+                    () => {
+                        // Picker confirmed; keep the same generation (already begun).
+                    },
+                );
+            }
+            if (generation !== loadGenerationRef.current) return;
+            finishLoadIfCurrent(generation, result);
         } catch (err: any) {
-            if (!isAbortError(err)) setError(err.message ?? String(err));
+            if (!isAbortError(err) && generation === loadGenerationRef.current) {
+                setError(err.message ?? String(err));
+            }
         } finally {
-            setLoading(false);
+            if (generation === loadGenerationRef.current) {
+                setHasTriedSavedFolder(true);
+                endLoad(generation);
+            }
         }
-    }, [onProgress, finalizeSessions, trainerNameOverride]);
+    }, [beginLoad, endLoad, finishLoadIfCurrent, makeLoadHandlers]);
 
     const saveTrainerNameOverride = useCallback((value: string) => {
         const trimmed = value.trim();
@@ -239,6 +347,12 @@ export function RaceStoreProvider({ children }: { children: React.ReactNode }) {
         });
     }, [loadFromSavedFolder]);
 
+    useEffect(() => () => {
+        if (progressRafRef.current !== null) {
+            cancelAnimationFrame(progressRafRef.current);
+        }
+    }, []);
+
     const value = useMemo(() => ({
         sessions,
         index,
@@ -251,8 +365,8 @@ export function RaceStoreProvider({ children }: { children: React.ReactNode }) {
         lastLoadedAt,
         latestFileName,
         loading,
+        loadingRemaining,
         hasTriedSavedFolder,
-        progress,
         error,
         loadFromFolder,
         reload,
@@ -271,8 +385,8 @@ export function RaceStoreProvider({ children }: { children: React.ReactNode }) {
         lastLoadedAt,
         latestFileName,
         loading,
+        loadingRemaining,
         hasTriedSavedFolder,
-        progress,
         error,
         loadFromFolder,
         reload,
@@ -281,8 +395,18 @@ export function RaceStoreProvider({ children }: { children: React.ReactNode }) {
         setScoreBonusEnabled,
     ]);
 
+    const progressValue = useMemo(() => ({
+        loading,
+        loadingRemaining,
+        progress,
+    }), [loading, loadingRemaining, progress]);
+
     return (
-        <RaceStoreContext.Provider value={value}>{children}</RaceStoreContext.Provider>
+        <RaceStoreContext.Provider value={value}>
+            <RaceProgressContext.Provider value={progressValue}>
+                {children}
+            </RaceProgressContext.Provider>
+        </RaceStoreContext.Provider>
     );
 }
 
@@ -292,3 +416,9 @@ export function useRaceStore() {
     return ctx;
 }
 
+/** Subscribe only to load progress — does not re-render dashboard data consumers. */
+export function useRaceProgress() {
+    const ctx = useContext(RaceProgressContext);
+    if (!ctx) throw new Error('useRaceProgress must be used within RaceStoreProvider');
+    return ctx;
+}

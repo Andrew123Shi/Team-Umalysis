@@ -13,11 +13,12 @@ import OverviewPage from './pages/dashboard/OverviewPage';
 import UmaAnalysisPage from './pages/dashboard/UmaAnalysisPage';
 import ReplayPage from './pages/ReplayPage';
 import SettingsPage from './pages/SettingsPage';
-import { RaceStoreProvider, useRaceStore } from './store/RaceStore';
+import { RaceStoreProvider, useRaceProgress, useRaceStore } from './store/RaceStore';
 
 function AppHeader() {
     const [headerEl, setHeaderEl] = useState<HTMLDivElement | null>(null);
-    const { reload, loading, index, progress } = useRaceStore();
+    const { reload, loading, index } = useRaceStore();
+    const { progress } = useRaceProgress();
     useStickyOffset(headerEl, '--sticky-app-header-height');
     const baseUrl = import.meta.env.BASE_URL;
 

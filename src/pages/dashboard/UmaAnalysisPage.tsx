@@ -6,6 +6,7 @@ import { aggregateByUma } from '../../analytics/aggregateTeamTrials';
 import { collectUmaRounds } from '../../analytics/styleSaturation';
 import { getLatestUmaEntry } from '../../analytics/umaComparison';
 import HistoricalUmaSelect from '../../components/HistoricalUmaSelect';
+import RemainingFilesLoadingAlert from '../../components/RemainingFilesLoadingAlert';
 import SectionHeading from '../../components/SectionHeading';
 import StatsPanels from '../../components/StatsPanels';
 import UmaLeaderboardSection from '../../components/UmaLeaderboardSection';
@@ -57,6 +58,7 @@ export default function UmaAnalysisPage() {
 
         return (
             <>
+                <RemainingFilesLoadingAlert />
                 <div className="mb-3">
                     <Button
                         variant="outline-secondary"
@@ -87,6 +89,7 @@ export default function UmaAnalysisPage() {
 
     return (
         <>
+            <RemainingFilesLoadingAlert />
             {rosterGrid.length > 0 && (
                 <section className="analytics-section">
                     <SectionHeading

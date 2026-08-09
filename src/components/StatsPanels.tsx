@@ -1,11 +1,12 @@
-import { Button, ButtonGroup, Card } from 'react-bootstrap';
-import { useState } from 'react';
+import { Button, ButtonGroup, Card, OverlayTrigger, Tooltip } from 'react-bootstrap';
+import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 
 import type { AggregatedStats, TTRound, UmaEntry } from '../analytics/types';
 
 import { COL_HALF, COL_THIRD } from './layout';
 import SectionHeading from './SectionHeading';
+import { useLoadingRemainingFiles } from './RemainingFilesLoadingAlert';
 
 import MatchupTable from './charts/MatchupTable';
 
@@ -47,6 +48,24 @@ export function StatsScopeToggle({
     value: StatsScope;
     onChange: (value: StatsScope) => void;
 }) {
+    const overallDisabled = useLoadingRemainingFiles();
+    const overallButton = (
+        <Button
+            variant={value === 'overall' ? 'secondary' : 'outline-secondary'}
+            className={overallDisabled ? 'disabled' : undefined}
+            aria-disabled={overallDisabled}
+            tabIndex={overallDisabled ? -1 : undefined}
+            // Bootstrap .disabled sets pointer-events:none; keep hover so the tooltip works.
+            style={overallDisabled ? { pointerEvents: 'auto' } : undefined}
+            onClick={() => {
+                if (overallDisabled) return;
+                onChange('overall');
+            }}
+        >
+            Overall
+        </Button>
+    );
+
     return (
         <ButtonGroup size="sm">
             <Button
@@ -55,12 +74,16 @@ export function StatsScopeToggle({
             >
                 Recent
             </Button>
-            <Button
-                variant={value === 'overall' ? 'secondary' : 'outline-secondary'}
-                onClick={() => onChange('overall')}
-            >
-                Overall
-            </Button>
+            {overallDisabled ? (
+                <OverlayTrigger
+                    placement="top"
+                    overlay={<Tooltip id="overall-scope-loading">Loading...</Tooltip>}
+                >
+                    {overallButton}
+                </OverlayTrigger>
+            ) : (
+                overallButton
+            )}
         </ButtonGroup>
     );
 }
@@ -183,6 +206,11 @@ export default function StatsPanels({
     const [overviewSectionScopes, setOverviewSectionScopes] = useState<OverviewSectionScopes>(
         DEFAULT_OVERVIEW_SECTION_SCOPES,
     );
+    const loadingRemaining = useLoadingRemainingFiles();
+    useEffect(() => {
+        if (!loadingRemaining) return;
+        setOverviewSectionScopes(DEFAULT_OVERVIEW_SECTION_SCOPES);
+    }, [loadingRemaining]);
     const showOverviewScopeControls = isTeamView && showDistanceWinRates && recentStats !== undefined;
     const overviewStatsFor = (section: OverviewSectionKey): AggregatedStats => (
         showOverviewScopeControls && overviewSectionScopes[section] === 'recent'
@@ -238,8 +266,10 @@ export default function StatsPanels({
     const progressionStats = overviewStatsFor('progression');
     const progressionUsesRecent = showOverviewScopeControls
         && overviewSectionScopes.progression === 'recent';
-    const progressionEmaSource = emaSourceTrend
-        ?? (progressionUsesRecent ? stats.scoreTrend : undefined);
+    // While older files load, avoid warm-starting EMA from incomplete "overall" history.
+    const progressionEmaSource = loadingRemaining
+        ? undefined
+        : (emaSourceTrend ?? (progressionUsesRecent ? stats.scoreTrend : undefined));
     const opponentCharacteristicsStats = overviewStatsFor('opponentCharacteristics');
     const skillStats = overviewStatsFor('skill');
     const racetrackStats = overviewStatsFor('racetrack');

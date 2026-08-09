@@ -4,13 +4,14 @@ import { Form } from 'react-bootstrap';
 import type { AggregatedStats, RosterUpdate } from '../../analytics/types';
 import { collectAllAxisValues, collectVisibleAxisValues, isLegendSeriesVisible, type LegendSelectChangedEvent } from './chartLegendScale';
 import { formatScore } from '../../utils/formatScore';
-import { emaForVisibleWindow } from '../../utils/ema';
+import { ema, emaForVisibleWindow, emaLineFadeColor } from '../../utils/ema';
 import { segmentAverage } from '../../utils/segmentAverage';
 import { formatUmaDisplayName } from '../../utils/umaDisplayName';
 import { formatRatingHtml } from '../RatingDisplay';
 import { chartTooltipStyle } from './chartTooltip';
 import { CHART_UPDATE_ANIMATION } from './chartLayout';
 import SectionHeading from '../SectionHeading';
+import { useLoadingRemainingFiles } from '../RemainingFilesLoadingAlert';
 
 const RATING_Y_STEP = 10_000;
 const RATING_GRID_LEFT = 82;
@@ -166,6 +167,7 @@ export default function TeamRatingTrendChart({
     /** Full-history trend used to warm-start EMA when `stats` is a Recent window. */
     emaSourceTrend?: AggregatedStats['scoreTrend'];
 }) {
+    const loadingRemaining = useLoadingRemainingFiles();
     const [emaPeriod, setEmaPeriod] = useState(50);
     const [legendSelected, setLegendSelected] = useState<Record<string, boolean>>({});
     const scoreTrend = stats.scoreTrend;
@@ -178,22 +180,12 @@ export default function TeamRatingTrendChart({
     const opponentRatings = scoreTrend.map((d) => d.opponentTeamRating);
     const scoreToRatingRatios = scoreTrend.map(sotrRatio);
     const sourceKeys = useMemo(
-        () => emaSourceTrend?.map((d) => d.fileName),
-        [emaSourceTrend],
+        () => (loadingRemaining ? undefined : emaSourceTrend?.map((d) => d.fileName)),
+        [emaSourceTrend, loadingRemaining],
     );
     const sourceRatios = useMemo(
-        () => emaSourceTrend?.map((d) => sotrRatio(d) ?? 0),
-        [emaSourceTrend],
-    );
-    const scoreRatioEma = useMemo(
-        () => emaForVisibleWindow(
-            scoreToRatingRatios.map((r) => r ?? 0),
-            trendKeys,
-            sourceRatios,
-            sourceKeys,
-            emaPeriod,
-        ),
-        [scoreToRatingRatios, trendKeys, sourceRatios, sourceKeys, emaPeriod],
+        () => (loadingRemaining ? undefined : emaSourceTrend?.map((d) => sotrRatio(d) ?? 0)),
+        [emaSourceTrend, loadingRemaining],
     );
     const rosterBoundaryIndices = useMemo(
         () => scoreTrend
@@ -204,6 +196,26 @@ export default function TeamRatingTrendChart({
     const scoreRatioSegmentAvg = useMemo(
         () => segmentAverage(scoreToRatingRatios, rosterBoundaryIndices),
         [scoreToRatingRatios, rosterBoundaryIndices],
+    );
+    const rosterAverageSeed = useMemo(() => {
+        if (!loadingRemaining) return undefined;
+        const seed = scoreRatioSegmentAvg[0];
+        return seed != null && Number.isFinite(seed) ? seed : undefined;
+    }, [loadingRemaining, scoreRatioSegmentAvg]);
+    const scoreRatioEma = useMemo(
+        () => {
+            const visibleRatios = scoreToRatingRatios.map((r) => r ?? 0);
+            return loadingRemaining
+                ? ema(visibleRatios, emaPeriod, rosterAverageSeed)
+                : emaForVisibleWindow(
+                    visibleRatios,
+                    trendKeys,
+                    sourceRatios,
+                    sourceKeys,
+                    emaPeriod,
+                );
+        },
+        [loadingRemaining, scoreToRatingRatios, trendKeys, sourceRatios, sourceKeys, emaPeriod, rosterAverageSeed],
     );
     const emaLabel = sotrEmaLabel(emaPeriod);
 
@@ -272,6 +284,9 @@ export default function TeamRatingTrendChart({
             0,
         );
         const legendData = [OWN_TEAM_RATING_LABEL, 'Opponent Team Rating', SOTR_LABEL, emaLabel, SEGMENT_AVG_LABEL];
+        const emaStroke = loadingRemaining
+            ? emaLineFadeColor('#ffc107', scoreRatioEma.length)
+            : '#ffc107';
 
         return {
             backgroundColor: 'transparent',
@@ -415,7 +430,7 @@ export default function TeamRatingTrendChart({
                     smooth: true,
                     showSymbol: false,
                     itemStyle: { color: '#ffc107' },
-                    lineStyle: { width: 2, type: 'dashed' },
+                    lineStyle: { width: 2, type: 'dashed', color: emaStroke },
                     z: 4,
                 },
                 {
@@ -451,6 +466,7 @@ export default function TeamRatingTrendChart({
         showLeftGrid,
         showRightGrid,
         alignDualAxes,
+        loadingRemaining,
     ]);
 
     if (!hasData) return null;

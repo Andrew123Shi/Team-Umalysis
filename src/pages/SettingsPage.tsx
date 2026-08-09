@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Button, Container, Form } from 'react-bootstrap';
 
 import SectionHeading from '../components/SectionHeading';
-import { useRaceStore } from '../store/RaceStore';
+import { useRaceProgress, useRaceStore } from '../store/RaceStore';
 
 export default function SettingsPage() {
     const {
@@ -18,8 +18,8 @@ export default function SettingsPage() {
         saveTrainerNameOverride,
         setScoreBonusEnabled,
         loading,
-        progress,
     } = useRaceStore();
+    const { progress } = useRaceProgress();
 
     const [trainerName, setTrainerName] = useState(trainerNameOverride);
     const [message, setMessage] = useState('');
@@ -63,7 +63,7 @@ export default function SettingsPage() {
                     </Button>
                     {loading && (
                         <span className="text-muted">
-                            {progress.total > 0 ? `Loading ${progress.loaded}/${progress.total} files...` : 'Loading files...'}
+                            {progress.total > 0 ? `Loading ${progress.loaded}/${progress.total} files...` : 'Initializing file loading...'}
                         </span>
                     )}
                 </div>

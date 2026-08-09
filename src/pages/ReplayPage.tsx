@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Alert, Button, ButtonGroup, Col, Form, ListGroup, Row, Spinner } from 'react-bootstrap';
 import RaceDataPresenter from '../components/RaceDataPresenter';
+import PriorityFilesLoadingAlert from '../components/PriorityFilesLoadingAlert';
+import RemainingFilesLoadingAlert from '../components/RemainingFilesLoadingAlert';
 import { DISTANCE_LABELS, type SessionIndexEntry, type TTRound } from '../analytics/types';
 import { getCourseDisplayName } from '../utils/course';
 import { formatScore } from '../utils/formatScore';
@@ -37,7 +39,7 @@ function formatReplayRoundDescription(round: TTRound): string {
 }
 
 export default function ReplayPage() {
-    const { sessions, index, loading, error, progress, hasTriedSavedFolder, loadFromFolder } = useRaceStore();
+    const { sessions, index, loading, error, hasTriedSavedFolder, loadFromFolder } = useRaceStore();
     const [selectedSessionId, setSelectedSessionId] = useState('');
     const [selectedRound, setSelectedRound] = useState(0);
     const [filter, setFilter] = useState('');
@@ -66,12 +68,10 @@ export default function ReplayPage() {
 
     const round = session?.rounds[selectedRound];
 
-    if (loading) {
+    if (loading && !sessions.length) {
         return (
             <div className="page-shell">
-                <Alert variant="info" className="app-card dashboard-loading-alert">
-                    {progress.total > 0 ? `Loading ${progress.loaded}/${progress.total} files...` : 'Loading files...'}
-                </Alert>
+                <PriorityFilesLoadingAlert />
             </div>
         );
     }
@@ -102,6 +102,7 @@ export default function ReplayPage() {
 
     return (
         <div className="page-shell">
+            <RemainingFilesLoadingAlert />
             <Row className="replay-layout">
                 <Col md={3}>
                     <div className="replay-sidebar-card p-3">

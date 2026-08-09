@@ -5,13 +5,14 @@ import type { AggregatedStats, RosterChangeUma, RosterUpdate } from '../../analy
 import type { StatCardViewMode } from './StatCards';
 import { type LegendSelectChangedEvent } from './chartLegendScale';
 import { formatScore } from '../../utils/formatScore';
-import { emaForVisibleWindow } from '../../utils/ema';
+import { ema, emaForVisibleWindow, emaLineFadeColor } from '../../utils/ema';
 import { segmentAverage } from '../../utils/segmentAverage';
 import { formatUmaDisplayName } from '../../utils/umaDisplayName';
 import { formatRatingHtml } from '../RatingDisplay';
 import { chartTooltipStyle } from './chartTooltip';
 import { CHART_UPDATE_ANIMATION } from './chartLayout';
 import SectionHeading from '../SectionHeading';
+import { useLoadingRemainingFiles } from '../RemainingFilesLoadingAlert';
 import { useRaceStore } from '../../store/RaceStore';
 
 type ScoreLegendKey = 'score' | 'ema' | 'segmentAvg' | 'bonus';
@@ -76,11 +77,11 @@ function snapBonusPercentYRange(values: number[]): { min: number; max: number } 
     if (finite.length === 0) return { min: 0, max: 10 };
     const min = Math.min(...finite);
     const max = Math.max(...finite);
-    let snappedMin = Math.floor(min * 2) / 2;
-    let snappedMax = Math.ceil(max * 2) / 2;
+    let snappedMin = Math.floor(min);
+    let snappedMax = Math.ceil(max);
     if (snappedMax - snappedMin < 1) {
-        snappedMin = Math.max(0, snappedMin - 0.5);
-        snappedMax += 0.5;
+        snappedMin = Math.max(0, snappedMin - 1);
+        snappedMax += 1;
     }
     return { min: snappedMin, max: snappedMax };
 }
@@ -201,6 +202,7 @@ export default function ScoreTrendChart({
     viewMode?: StatCardViewMode;
 }) {
     const { debugMode } = useRaceStore();
+    const loadingRemaining = useLoadingRemainingFiles();
     const [emaPeriod, setEmaPeriod] = useState(50);
     const [legendSelected, setLegendSelected] = useState<ScoreLegendSelection>({});
 
@@ -211,17 +213,12 @@ export default function ScoreTrendChart({
     const bonusValues = stats.scoreTrend.map((d) => bonusPercent(d.supportCardBonus));
 
     const sourceKeys = useMemo(
-        () => emaSourceTrend?.map((d) => d.fileName),
-        [emaSourceTrend],
+        () => (loadingRemaining ? undefined : emaSourceTrend?.map((d) => d.fileName)),
+        [emaSourceTrend, loadingRemaining],
     );
     const sourceRawScores = useMemo(
-        () => emaSourceTrend?.map((d) => d.teamScore),
-        [emaSourceTrend],
-    );
-
-    const rawEma = useMemo(
-        () => emaForVisibleWindow(rawScores, trendKeys, sourceRawScores, sourceKeys, emaPeriod),
-        [rawScores, trendKeys, sourceRawScores, sourceKeys, emaPeriod],
+        () => (loadingRemaining ? undefined : emaSourceTrend?.map((d) => d.teamScore)),
+        [emaSourceTrend, loadingRemaining],
     );
 
     const isDistanceView = viewMode === 'distance';
@@ -239,11 +236,23 @@ export default function ScoreTrendChart({
     );
 
     const activeScores = rawScores;
-    const activeEma = rawEma;
     const activeSegmentAvg = useMemo(
         () => segmentAverage(activeScores, rosterBoundaryIndices),
         [activeScores, rosterBoundaryIndices],
     );
+    const rosterAverageSeed = useMemo(() => {
+        if (!loadingRemaining) return undefined;
+        const seed = activeSegmentAvg[0];
+        return seed != null && Number.isFinite(seed) ? seed : undefined;
+    }, [activeSegmentAvg, loadingRemaining]);
+
+    const rawEma = useMemo(
+        () => (loadingRemaining
+            ? ema(rawScores, emaPeriod, rosterAverageSeed)
+            : emaForVisibleWindow(rawScores, trendKeys, sourceRawScores, sourceKeys, emaPeriod)),
+        [loadingRemaining, rawScores, trendKeys, sourceRawScores, sourceKeys, emaPeriod, rosterAverageSeed],
+    );
+    const activeEma = rawEma;
 
     const dateInterval = dates.length > 12 ? Math.ceil(dates.length / 8) - 1 : 0;
     const emaLabel = `EMA ${Math.max(1, Math.floor(emaPeriod))}`;
@@ -321,6 +330,9 @@ export default function ScoreTrendChart({
             0,
             0,
         );
+        const emaStroke = loadingRemaining
+            ? emaLineFadeColor('#ffc107', activeEma.length)
+            : '#ffc107';
 
         const scoreSeries = [
             {
@@ -344,7 +356,7 @@ export default function ScoreTrendChart({
                 smooth: true,
                 showSymbol: false,
                 itemStyle: { color: '#ffc107' },
-                lineStyle: { width: 2, type: 'dashed' as const },
+                lineStyle: { width: 2, type: 'dashed' as const, color: emaStroke },
                 z: 4,
             },
             {
@@ -532,7 +544,7 @@ export default function ScoreTrendChart({
                 nameGap: 50,
                 min: bonusYRange.min,
                 max: bonusYRange.max,
-                interval: 0.5,
+                interval: 1,
                 axisLabel: {
                     color: '#ced4da',
                     fontSize: 11,
@@ -583,6 +595,7 @@ export default function ScoreTrendChart({
         legendSelected,
         echartsLegendSelected,
         debugMode,
+        loadingRemaining,
     ]);
 
     return (

@@ -11,13 +11,14 @@ import { DISTANCE_ORDER } from '../../analytics/types';
 import type { AggregatedStats } from '../../analytics/types';
 import { listHistoricalUmas } from '../../analytics/umaComparison';
 import { useDashboardReady } from '../../hooks/useDashboardReady';
+import PriorityFilesLoadingAlert from '../../components/PriorityFilesLoadingAlert';
 import { useRaceStore } from '../../store/RaceStore';
 import type { DashboardOutletContext } from './types';
 import { latestTrialSessions, RECENT_TRIAL_LIMIT, scrollToDashboardTop } from './utils';
 
 export default function DashboardLayout() {
     const location = useLocation();
-    const { sessions, loading, progress, error, hasTriedSavedFolder, loadFromFolder, scoreBonuses } = useRaceStore();
+    const { sessions, loading, error, hasTriedSavedFolder, loadFromFolder, scoreBonuses } = useRaceStore();
     const dashboardReady = useDashboardReady(sessions);
     const showDashboardLoading = sessions.length > 0 && !dashboardReady;
 
@@ -79,10 +80,8 @@ export default function DashboardLayout() {
         <div className="page-shell dashboard-page">
             {error ? (
                 <Alert variant="danger">{error}</Alert>
-            ) : loading ? (
-                <Alert variant="info" className="app-card dashboard-loading-alert">
-                    {progress.total > 0 ? `Loading ${progress.loaded}/${progress.total} files...` : 'Loading files...'}
-                </Alert>
+            ) : loading && !sessions.length ? (
+                <PriorityFilesLoadingAlert />
             ) : !sessions.length ? (
                 <div className="app-card empty-state">
                     <h2 className="h4">Choose Your Team Trials Folder</h2>
@@ -99,7 +98,7 @@ export default function DashboardLayout() {
                 <>
                     {showDashboardLoading && (
                         <Alert variant="info" className="app-card dashboard-loading-alert">
-                            Loading race data...
+                            Loading dashboard...
                         </Alert>
                     )}
                     {dashboardReady && <Outlet context={outletContext} />}

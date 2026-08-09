@@ -2,6 +2,7 @@ import { memo, startTransition, useCallback, useEffect, useRef, useState } from 
 import { Col, Row } from 'react-bootstrap';
 import { DISTANCE_LABELS, DISTANCE_ORDER, type AggregatedStats } from '../analytics/types';
 import DistanceJumpNav from './DistanceJumpNav';
+import { useLoadingRemainingFiles } from './RemainingFilesLoadingAlert';
 import SectionHeading from './SectionHeading';
 import StatsPanels, { StatsScopeToggle, type StatsScope } from './StatsPanels';
 
@@ -43,6 +44,7 @@ const DistanceSection = memo(function DistanceSection({
 });
 
 export default function DistanceDashboard({ distanceStats, recentDistanceStats }: Props) {
+    const loadingRemaining = useLoadingRemainingFiles();
     const [scope, setScope] = useState<StatsScope>('recent');
     const [activeDistance, setActiveDistance] = useState<number>(DISTANCE_ORDER[0]);
     const [displayedScopes, setDisplayedScopes] = useState<DistanceScopeState>(() => buildScopeState('recent'));
@@ -56,6 +58,13 @@ export default function DistanceDashboard({ distanceStats, recentDistanceStats }
     useEffect(() => clearBackgroundUpdates, [clearBackgroundUpdates]);
 
     useEffect(() => {
+        if (!loadingRemaining || scope === 'recent') return;
+        clearBackgroundUpdates();
+        setScope('recent');
+        setDisplayedScopes(buildScopeState('recent'));
+    }, [clearBackgroundUpdates, loadingRemaining, scope]);
+
+    useEffect(() => {
         setDisplayedScopes((current) => {
             if (current[activeDistance] === scope) return current;
             return { ...current, [activeDistance]: scope };
@@ -64,6 +73,7 @@ export default function DistanceDashboard({ distanceStats, recentDistanceStats }
 
     const changeScope = (nextScope: StatsScope) => {
         if (nextScope === scope) return;
+        if (nextScope === 'overall' && loadingRemaining) return;
 
         setScope(nextScope);
         clearBackgroundUpdates();
