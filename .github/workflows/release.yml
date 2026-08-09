@@ -23,16 +23,19 @@ jobs:
         run: |
           set -euo pipefail
           TAG="${GITHUB_REF_NAME}"
+          REPO="${GITHUB_REPOSITORY}"
           PREV="$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || true)"
 
+          if [ -n "${PREV}" ]; then
+            RANGE="${PREV}..${TAG}"
+          else
+            RANGE="${TAG}"
+          fi
+
           {
-            echo "## What's Changed"
+            echo "## Changelog"
             echo
-            if [ -n "${PREV}" ]; then
-              git log --pretty=format:'- %s' "${PREV}..${TAG}"
-            else
-              git log --pretty=format:'- %s' "${TAG}"
-            fi
+            git log --pretty=format:"- %s ([%h](https://github.com/${REPO}/commit/%H))" "${RANGE}"
             echo
             echo
             echo "Visit Team-Umalysis at https://andrew123shi.github.io/Team-Umalysis/!"
