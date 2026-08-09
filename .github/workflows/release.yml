@@ -14,11 +14,32 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Create GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "${GITHUB_REF_NAME}" \
-            --title "${GITHUB_REF_NAME}" \
-            --generate-notes
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          PREV="$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || true)"
+
+          {
+            echo "## What's Changed"
+            echo
+            if [ -n "${PREV}" ]; then
+              git log --pretty=format:'- %s' "${PREV}..${TAG}"
+            else
+              git log --pretty=format:'- %s' "${TAG}"
+            fi
+            echo
+            echo
+            echo "Visit Team-Umalysis at https://andrew123shi.github.io/Team-Umalysis/!"
+          } > notes.md
+
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release edit "${TAG}" --notes-file notes.md --title "${TAG}"
+          else
+            gh release create "${TAG}" --notes-file notes.md --title "${TAG}"
+          fi
