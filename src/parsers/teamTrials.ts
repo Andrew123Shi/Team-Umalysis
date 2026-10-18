@@ -22,6 +22,7 @@ import {
     isRoundWinByPlacement,
 } from '../analytics/umaIdentity';
 import { DISTANCE_LABELS as DISTANCE_MAP } from '../analytics/types';
+import { VICTORY_BONUS_BASE, VICTORY_BONUS_ID, VICTORY_MIN_ROUND_WINS } from '../analytics/scoreIds';
 
 const RUNAWAY_TRIGGER_SKILL_ID = 202051;
 const METERS_PER_LENGTH = 2.5;
@@ -57,6 +58,51 @@ function buildScoreEvents(scoreArray: any[] | undefined): ScoreEvent[] {
             bonusScores,
         };
     });
+}
+
+function roundScoreEvents(round: TTRound): ScoreEvent[] {
+    return [...round.playerUmas.flatMap((uma) => uma.scoreEvents), ...round.teamScoreEvents];
+}
+
+/**
+ * The opponent rating bonus is ceil(base × rate) with one rate per session, so the
+ * victory bonus gets the same bonus as any 10,000-base line (Finish 1st). Without
+ * one, the rate is bracketed from the other lines.
+ */
+function victoryOpponentRatingBonus(rounds: TTRound[]): number {
+    const events = rounds.flatMap(roundScoreEvents);
+    const sameBase = events.find((e) => e.baseScore === VICTORY_BONUS_BASE && e.bonusScores.opponentRating > 0);
+    if (sameBase) return sameBase.bonusScores.opponentRating;
+
+    let low = 0;
+    let high = Number.POSITIVE_INFINITY;
+    events.forEach((e) => {
+        if (e.baseScore <= 0 || e.bonusScores.opponentRating <= 0) return;
+        low = Math.max(low, (e.bonusScores.opponentRating - 1) / e.baseScore);
+        high = Math.min(high, e.bonusScores.opponentRating / e.baseScore);
+    });
+    if (!Number.isFinite(high)) return 0;
+    return Math.ceil(VICTORY_BONUS_BASE * ((low + high) / 2));
+}
+
+function buildVictoryBonus(rounds: TTRound[]): ScoreEvent | null {
+    const roundWins = rounds.filter((round) => round.playerWonRound).length;
+    if (roundWins < VICTORY_MIN_ROUND_WINS) return null;
+    const opponentRating = victoryOpponentRatingBonus(rounds);
+    return {
+        rawScoreId: VICTORY_BONUS_ID,
+        num: 1,
+        score: VICTORY_BONUS_BASE + opponentRating,
+        baseScore: VICTORY_BONUS_BASE,
+        bonusScores: { ...emptyScoreBonusBreakdown(), opponentRating },
+    };
+}
+
+/** win_type is 1 (win) / 2 (loss) for the player's team; older files fall back to placements. */
+function isPlayerRoundWin(winType: number, playerUmas: UmaEntry[], opponentUmas: UmaEntry[]): boolean {
+    if (winType === 1) return true;
+    if (winType === 2) return false;
+    return isRoundWinByPlacement(playerUmas, opponentUmas);
 }
 
 function charaResultTeamKey(trainedCharaId: number, teamId: number): string {
@@ -295,7 +341,7 @@ function buildUmaEntry(
         finishTime: Number(charaResult?.finish_time ?? 0),
         ...(winMarginLengths !== undefined ? { winMarginLengths } : {}),
         totalScore: scoreEvents.reduce((sum, e) => sum + e.score, 0),
-        totalBaseScore: scoreEvents.reduce((sum, e) => sum + (e.baseScore ?? e.score), 0),
+        totalBaseScore: scoreEvents.reduce((sum, e) => sum + e.baseScore, 0),
         scoreEvents,
         activatedSkillIds: extractActivatedSkills(raceData, frameOrder),
         motivation: Number(horse.motivation ?? 3),
@@ -420,6 +466,7 @@ export function parseTeamTrialSession(json: any, fileName: string): TTSession | 
             else npcUmas.push(entry);
         });
 
+        const winType = Number(result.win_type ?? 0);
         rounds.push({
             round: parsed.round,
             distanceType: Number(result.distance_type ?? index + 1),
@@ -431,13 +478,13 @@ export function parseTeamTrialSession(json: any, fileName: string): TTSession | 
             supportCardBonus: Number(json.support_card_bonus ?? 0),
             teamTotalScore: Number(result.team_total_score ?? 0),
             teamScoreEvents: buildScoreEvents(result.team_score_array),
-            winType: Number(result.win_type ?? 0),
+            winType,
             consecutiveWins: Number(result.current_consecutive_win_count ?? 0),
             playerUmas,
             opponentUmas,
             npcUmas,
             parsedRace: parsed,
-            playerWonRound: isRoundWinByPlacement(playerUmas, opponentUmas),
+            playerWonRound: isPlayerRoundWin(winType, playerUmas, opponentUmas),
         });
     }
 
@@ -450,6 +497,7 @@ export function parseTeamTrialSession(json: any, fileName: string): TTSession | 
         opponentTrainerName: detectOpponentTrainerFromSession(starts, playerIdentity),
         supportCardBonus: Number(json.support_card_bonus ?? 0),
         rounds,
+        victoryBonus: buildVictoryBonus(rounds),
     };
 }
 

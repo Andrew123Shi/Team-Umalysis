@@ -1,10 +1,18 @@
 import { useEffect, useState } from 'react';
 
-import { Alert, Button, Container, Form } from 'react-bootstrap';
+import { Alert, Button, ButtonGroup, Container, Form } from 'react-bootstrap';
 
+import type { ScoreBonusKey } from '../analytics/types';
 import SectionHeading from '../components/SectionHeading';
 import { useRaceProgress, useRaceStore } from '../store/RaceStore';
+import { BASE_SCORE_ONLY, IN_GAME_SCORE, SCORE_BONUS_KEYS } from '../utils/teamTrialScore';
 
+const SCORE_BONUS_LABELS: Record<ScoreBonusKey, string> = {
+    supportCard: 'Support Card Bonus',
+    opponentRating: 'Opponent Rating Bonus',
+    streak: 'Win Streak Bonus',
+    ace: 'Ace Bonus',
+};
 export default function SettingsPage() {
     const {
         lastLoadedAt,
@@ -17,9 +25,12 @@ export default function SettingsPage() {
         reload,
         saveTrainerNameOverride,
         setScoreBonusEnabled,
+        setAllScoreBonuses,
         loading,
     } = useRaceStore();
     const { progress } = useRaceProgress();
+    const isBaseOnly = SCORE_BONUS_KEYS.every((key) => !scoreBonuses[key]);
+    const isInGame = SCORE_BONUS_KEYS.every((key) => scoreBonuses[key]);
 
     const [trainerName, setTrainerName] = useState(trainerNameOverride);
     const [message, setMessage] = useState('');
@@ -101,48 +112,49 @@ export default function SettingsPage() {
                 <SectionHeading level="section" title="Settings: Score Bonuses" className="mt-0" />
 
                 <p className="text-muted mb-2">
-                    Choose which bonuses are included in score analytics.
-                    Changes apply immediately and are saved in this browser.
+                    Team Trials scores are calculated as a base value plus up to four bonuses. Choose which bonuses count in score analytics:
                 </p>
 
-                <Form.Check
-                    type="checkbox"
-                    id="score-bonus-support-card"
-                    checked={scoreBonuses.supportCard}
-                    onChange={(e) => setScoreBonusEnabled('supportCard', e.target.checked)}
-                    label="Support Card Bonus"
-                    className="mb-0"
-                />
+                <ButtonGroup size="sm" className="mb-3">
+                    <Button
+                        variant={isBaseOnly ? 'secondary' : 'outline-secondary'}
+                        onClick={() => setAllScoreBonuses(BASE_SCORE_ONLY)}
+                    >
+                        Base Score Only
+                    </Button>
+                    <Button
+                        variant={isInGame ? 'secondary' : 'outline-secondary'}
+                        onClick={() => setAllScoreBonuses(IN_GAME_SCORE)}
+                    >
+                        Match In-Game Score
+                    </Button>
+                </ButtonGroup>
 
-                <Form.Text className="d-block text-muted fst-italic my-1">
-                    Applies to Uma and Distance Analysis only:
-                </Form.Text>
-                <Form.Check
-                    type="checkbox"
-                    id="score-bonus-ace"
-                    checked={scoreBonuses.ace}
-                    onChange={(e) => setScoreBonusEnabled('ace', e.target.checked)}
-                    label="Ace Bonus"
-                />
-                <Form.Check
-                    type="checkbox"
-                    id="score-bonus-opponent-rating"
-                    checked={scoreBonuses.opponentRating}
-                    onChange={(e) => setScoreBonusEnabled('opponentRating', e.target.checked)}
-                    label="Opponent Rating Bonus"
-                />
-                <Form.Check
-                    type="checkbox"
-                    id="score-bonus-streak"
-                    checked={scoreBonuses.streak}
-                    onChange={(e) => setScoreBonusEnabled('streak', e.target.checked)}
-                    label="Streak Bonus"
-                    className="mb-2"
-                />
+                {SCORE_BONUS_KEYS.map((key) => (
+                    <Form.Check
+                        key={key}
+                        type="checkbox"
+                        id={`score-bonus-${key}`}
+                        checked={scoreBonuses[key]}
+                        onChange={(e) => setScoreBonusEnabled(key, e.target.checked)}
+                        label={SCORE_BONUS_LABELS[key]}
+                    />
+                ))}
 
-                <Form.Text className="d-block text-muted mt-0">
-                    With all options off, Distance Analysis includes the All Members Placed bonus
-                    while Uma Analysis uses base score only.
+                <Form.Text as="div" className="text-muted mt-3">
+                    <strong>How scores are totaled:</strong>
+                    <ul className="mb-0 ps-3">
+                        <li>Uma scores count only that uma&apos;s own score lines.</li>
+                        <li>
+                            Race scores count all three umas plus the placement team bonuses (e.g. All Members Placed)
+                        </li>
+                        <li>
+                            Session totals count all five races plus the victory bonus.
+                        </li>
+                        <li>
+                            The replay list always shows in-game scores.
+                        </li>
+                    </ul>
                 </Form.Text>
             </div>
         </Container>

@@ -10,7 +10,6 @@ import type {
     RosterUmaSlot,
     RosterUpdate,
     ScoreBonusSettings,
-    ScoreEvent,
     SkillFrequencyEntry,
     StyleComposition,
     StyleMatchupEntry,
@@ -22,24 +21,19 @@ import type {
 import { computeTotalSkillPoints, isGoldSkill } from './skillUtils';
 import { buildUmaFingerprint } from './umaIdentity';
 import { aggregateScoreBreakdown } from './scoreBreakdown';
+import { VICTORY_MIN_ROUND_WINS } from './scoreIds';
 import { buildStyleSaturation } from './styleSaturation';
 import { DISTANCE_LABELS, DISTANCE_ORDER, STRATEGY_LABELS } from './types';
 import {
-    rawRoundTeamScore,
-    rawSessionTeamScore,
-    roundSupportCardBonusScore,
+    BASE_SCORE_ONLY,
+    inGameRoundScore,
+    inGameSessionScore,
+    roundScore,
+    sessionScore,
+    umaScore,
 } from '../utils/teamTrialScore';
 
 type AggregateOptions = { buildKey?: string; distanceType?: number; scoreBonuses?: ScoreBonusSettings };
-
-const DEFAULT_SCORE_BONUSES: ScoreBonusSettings = {
-    ace: false,
-    opponentRating: false,
-    streak: false,
-    supportCard: false,
-};
-
-const TEAM_PLACEMENT_SCORE_IDS = new Set([94, 95]);
 
 function summarize(values: number[]): NumericSummary {
     if (values.length === 0) {
@@ -252,7 +246,7 @@ function buildMatchups(
 
             totalRounds += 1;
             const seenInRound = new Set<string>();
-            const score = roundPlayerScore(round, bonuses, options?.buildKey, options?.buildKey === undefined);
+            const score = roundScore(round, bonuses, options?.buildKey);
 
             round.opponentUmas.forEach((opp) => {
                 const key = `${opp.charaId}:${opp.cardId}`;
@@ -306,53 +300,7 @@ function buildMatchups(
 }
 
 function scoreBonuses(options?: AggregateOptions): ScoreBonusSettings {
-    return options?.scoreBonuses ?? DEFAULT_SCORE_BONUSES;
-}
-
-function umaDisplayScore(uma: UmaEntry, bonuses: ScoreBonusSettings): number {
-    const baseScore = Number.isFinite(uma.totalBaseScore) ? uma.totalBaseScore : uma.totalScore;
-    return baseScore + scoreEventBonusTotal(uma.scoreEvents, bonuses);
-}
-
-function scoreEventDisplayScore(event: ScoreEvent, bonuses: ScoreBonusSettings): number {
-    return (Number.isFinite(event.baseScore) ? event.baseScore : event.score)
-        + (bonuses.ace ? (event.bonusScores?.ace ?? 0) : 0)
-        + (bonuses.opponentRating ? (event.bonusScores?.opponentRating ?? 0) : 0)
-        + (bonuses.streak ? (event.bonusScores?.streak ?? 0) : 0)
-        + (bonuses.supportCard ? (event.bonusScores?.supportCard ?? 0) : 0);
-}
-
-function scoreEventBonusTotal(events: ScoreEvent[], bonuses: ScoreBonusSettings): number {
-    return events.reduce((sum, event) => (
-        sum
-        + (bonuses.ace ? (event.bonusScores?.ace ?? 0) : 0)
-        + (bonuses.opponentRating ? (event.bonusScores?.opponentRating ?? 0) : 0)
-        + (bonuses.streak ? (event.bonusScores?.streak ?? 0) : 0)
-        + (bonuses.supportCard ? (event.bonusScores?.supportCard ?? 0) : 0)
-    ), 0);
-}
-
-function allMembersPlacedScore(round: TTRound, bonuses: ScoreBonusSettings): number {
-    return round.teamScoreEvents
-        .filter((event) => TEAM_PLACEMENT_SCORE_IDS.has(event.rawScoreId))
-        .reduce((sum, event) => sum + scoreEventDisplayScore(event, bonuses), 0);
-}
-
-function roundOverallScore(round: TTRound, includeSupportCardBonus: boolean): number {
-    return rawRoundTeamScore(round) - (includeSupportCardBonus ? 0 : roundSupportCardBonusScore(round));
-}
-
-function roundPlayerScore(
-    round: TTRound,
-    bonuses: ScoreBonusSettings,
-    buildKey?: string,
-    includeAllMembersPlaced = false,
-): number {
-    const playerScore = round.playerUmas.reduce((sum, uma) => {
-        if (buildKey !== undefined && uma.buildKey !== buildKey) return sum;
-        return sum + umaDisplayScore(uma, bonuses);
-    }, 0);
-    return playerScore + (includeAllMembersPlaced ? allMembersPlacedScore(round, bonuses) : 0);
+    return options?.scoreBonuses ?? BASE_SCORE_ONLY;
 }
 
 function buildTrackMatchups(
@@ -398,7 +346,7 @@ function buildTrackMatchups(
                     countedWin = true;
                 }
             });
-            entry.normalizedScores.push(roundPlayerScore(round, bonuses, options?.buildKey, options?.buildKey === undefined));
+            entry.normalizedScores.push(roundScore(round, bonuses, options?.buildKey));
             map.set(courseId, entry);
         });
     });
@@ -536,8 +484,7 @@ function trendPointWon(
         const round = session.rounds.find((r) => r.distanceType === options.distanceType);
         return round?.playerWonRound ?? false;
     }
-    const teamRoundWins = session.rounds.filter((r) => r.playerWonRound).length;
-    return teamRoundWins >= 3;
+    return isSessionWon(session);
 }
 
 function sessionRaceWinRate(session: TTSession): number {
@@ -581,20 +528,20 @@ function buildRosterUpdatesBySessionId(
 }
 
 function sessionAggregateScore(session: TTSession, options?: AggregateOptions): number {
+    const bonuses = scoreBonuses(options);
     if (options?.distanceType !== undefined) {
         const round = session.rounds.find((r) => r.distanceType === options.distanceType);
-        return round ? roundPlayerScore(round, scoreBonuses(options), options.buildKey, options.buildKey === undefined) : 0;
+        return round ? roundScore(round, bonuses, options.buildKey) : 0;
     }
     if (options?.buildKey !== undefined) {
-        for (const round of session.rounds) {
-            if (round.playerUmas.some((u) => u.buildKey === options.buildKey)) {
-                return roundPlayerScore(round, scoreBonuses(options), options.buildKey);
-            }
-        }
-        return 0;
+        const round = session.rounds.find((r) => r.playerUmas.some((u) => u.buildKey === options.buildKey));
+        return round ? roundScore(round, bonuses, options.buildKey) : 0;
     }
-    const includeSupportCardBonus = scoreBonuses(options).supportCard;
-    return session.rounds.reduce((sum, round) => sum + roundOverallScore(round, includeSupportCardBonus), 0);
+    return sessionScore(session, bonuses);
+}
+
+function isSessionWon(session: TTSession): boolean {
+    return session.rounds.filter((r) => r.playerWonRound).length >= VICTORY_MIN_ROUND_WINS;
 }
 
 export function aggregateStats(
@@ -622,15 +569,11 @@ export function aggregateStats(
     const scores = rounds.flatMap((r) =>
         r.playerUmas
             .filter((u) => options?.buildKey === undefined || u.buildKey === options.buildKey)
-            .map((u) => umaDisplayScore(u, bonuses)),
+            .map((u) => umaScore(u, bonuses)),
     );
 
-    const teamScores = rounds.map((r) => (
-        options?.distanceType !== undefined || options?.buildKey !== undefined
-            ? roundPlayerScore(r, bonuses, options?.buildKey, options?.distanceType !== undefined && options?.buildKey === undefined)
-            : roundOverallScore(r, bonuses.supportCard)
-    ));
-    const rawTeamScores = rounds.map(rawRoundTeamScore);
+    const teamScores = rounds.map((r) => roundScore(r, bonuses, options?.buildKey));
+    const inGameTeamScores = rounds.map(inGameRoundScore);
     const wins = placements.filter((p) => p === 1).length;
     const top2 = placements.filter((p) => p <= 2).length;
     const top3 = placements.filter((p) => p <= 3).length;
@@ -690,15 +633,14 @@ export function aggregateStats(
             : undefined);
     const rosterUpdatesBySessionId = buildRosterUpdatesBySessionId(sessions, rosterScopeDistance);
     const sessionScoreTotals = filteredSessions.map((s) => sessionAggregateScore(s, options));
-    const rawSessionScoreTotals = filteredSessions.map((s) => rawSessionTeamScore(s.rounds));
+    const inGameSessionScoreTotals = filteredSessions.map(inGameSessionScore);
 
     const sessionWins = filteredSessions.filter((s) => {
         if (options?.distanceType !== undefined) {
             const round = s.rounds.find((r) => r.distanceType === options.distanceType);
             return round?.playerWonRound ?? false;
         }
-        const teamRoundWins = s.rounds.filter((r) => r.playerWonRound).length;
-        return teamRoundWins >= 3;
+        return isSessionWon(s);
     }).length;
 
     const ratingBuckets = new Map<string, { placements: number[]; wins: number }>();
@@ -723,7 +665,7 @@ export function aggregateStats(
             const entry = distanceMap.get(round.distanceLabel) ?? { roundWins: 0, rounds: 0, scoreTotals: [] };
             entry.rounds += 1;
             if (round.playerWonRound) entry.roundWins += 1;
-            entry.scoreTotals.push(roundPlayerScore(round, bonuses, options?.buildKey, options?.buildKey === undefined));
+            entry.scoreTotals.push(roundScore(round, bonuses, options?.buildKey));
             distanceMap.set(round.distanceLabel, entry);
         });
     });
@@ -754,7 +696,7 @@ export function aggregateStats(
                 wins: 0,
             };
             entry.placements.push(p.finishOrder);
-            entry.scores.push(umaDisplayScore(p, bonuses));
+            entry.scores.push(umaScore(p, bonuses));
             if (p.finishOrder === 1) entry.wins += 1;
             umaMap.set(key, entry);
         });
@@ -769,9 +711,9 @@ export function aggregateStats(
         placement: summarize(placements),
         score: summarize(scores),
         raceScoreTotal: summarize(sessionScoreTotals),
-        raceScoreTotalRaw: summarize(rawSessionScoreTotals),
+        raceScoreTotalInGame: summarize(inGameSessionScoreTotals),
         teamScore: summarize(teamScores),
-        teamScoreRaw: summarize(rawTeamScores),
+        teamScoreInGame: summarize(inGameTeamScores),
         winRate: placements.length > 0 ? wins / placements.length : 0,
         top2Rate: placements.length > 0 ? top2 / placements.length : 0,
         top3Rate: placements.length > 0 ? top3 / placements.length : 0,
@@ -816,7 +758,7 @@ export function aggregateStats(
                             return [{
                                 date: s.savedAt!.toISOString().slice(0, 10),
                                 fileName: s.fileName,
-                                teamScore: umaDisplayScore(uma, bonuses),
+                                teamScore: umaScore(uma, bonuses),
                                 supportCardBonus: s.supportCardBonus,
                                 selfTeamRating: teamRatings.selfTeamRating,
                                 opponentTeamRating: teamRatings.opponentTeamRating,
@@ -890,12 +832,7 @@ export function aggregateStats(
 }
 
 export function aggregateOverall(sessions: TTSession[], scoreBonuses?: ScoreBonusSettings): AggregatedStats {
-    return aggregateStats(sessions, {
-        scoreBonuses: {
-            ...DEFAULT_SCORE_BONUSES,
-            supportCard: scoreBonuses?.supportCard === true,
-        },
-    });
+    return aggregateStats(sessions, { scoreBonuses });
 }
 
 export function aggregateByUma(sessions: TTSession[], buildKey: string, scoreBonuses?: ScoreBonusSettings): AggregatedStats {

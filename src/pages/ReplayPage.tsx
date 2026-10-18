@@ -9,7 +9,7 @@ import { formatScore } from '../utils/formatScore';
 import { getSessionOpponentTrainer } from '../analytics/umaIdentity';
 import { useRaceStore } from '../store/RaceStore';
 import SectionHeading from '../components/SectionHeading';
-import { rawRoundTeamScore } from '../utils/teamTrialScore';
+import { inGameRoundScore } from '../utils/teamTrialScore';
 
 function formatTrialLabel(entry: SessionIndexEntry, opponentTrainerName: string): string {
     const opponent = opponentTrainerName || 'Unknown';
@@ -35,7 +35,7 @@ function formatReplayRoundDescription(round: TTRound): string {
     const courseId = round.courseId ?? round.parsedRace.detectedCourseId;
     const sprint = DISTANCE_LABELS[round.distanceType] ?? round.distanceLabel ?? 'Unknown';
     const course = getCourseDisplayName(courseId) ?? 'Unknown';
-    return `${sprint} · ${course} · Score ${formatScore(rawRoundTeamScore(round))} · Opp. Rating ${round.opponentEvaluate.toLocaleString()}`;
+    return `${sprint} · ${course} · Score ${formatScore(inGameRoundScore(round))} · Opp. Rating ${round.opponentEvaluate.toLocaleString()}`;
 }
 
 export default function ReplayPage() {

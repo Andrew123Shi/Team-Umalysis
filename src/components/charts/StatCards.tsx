@@ -64,7 +64,7 @@ function ScoreSummary({
     median,
     min,
     max,
-    rawAvg,
+    inGameAvg,
     compact = false,
 }: {
     title: string;
@@ -72,7 +72,8 @@ function ScoreSummary({
     median: number;
     min: number;
     max: number;
-    rawAvg?: number;
+    /** Shown only when the score bonus settings make avg differ from the in-game score. */
+    inGameAvg?: number;
     compact?: boolean;
 }) {
     return (
@@ -94,8 +95,8 @@ function ScoreSummary({
                                 <span><strong>Max</strong> <AnimatedText text={formatScore(max)} /></span>
                             </>
                         )}
-                        {rawAvg !== undefined && (
-                            <span><strong>Raw Avg</strong> <AnimatedText text={formatScore(rawAvg)} /></span>
+                        {inGameAvg !== undefined && Math.round(inGameAvg) !== Math.round(avg) && (
+                            <span><strong>In-Game Avg</strong> <AnimatedText text={formatScore(inGameAvg)} /></span>
                         )}
                     </div>
                 </div>
@@ -272,7 +273,7 @@ function AverageTotalScoreCard({
                 median={stats.teamScore.median}
                 min={stats.teamScore.min}
                 max={stats.teamScore.max}
-                rawAvg={stats.teamScoreRaw.avg}
+                inGameAvg={stats.teamScoreInGame.avg}
                 compact={compact}
             />
         );
@@ -294,9 +295,7 @@ function AverageTotalScoreCard({
             median={stats.raceScoreTotal.median}
             min={stats.raceScoreTotal.min}
             max={stats.raceScoreTotal.max}
-            rawAvg={stats.raceScoreTotalRaw.avg !== stats.raceScoreTotal.avg
-                ? stats.raceScoreTotalRaw.avg
-                : undefined}
+            inGameAvg={stats.raceScoreTotalInGame.avg}
             compact={compact}
         />
     );

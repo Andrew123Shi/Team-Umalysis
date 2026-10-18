@@ -10,17 +10,11 @@ import {
     type FolderLoadResult,
     type SessionLoadHandlers,
 } from '../data/raceLoader';
-import { rawSessionTeamScore } from '../utils/teamTrialScore';
+import { BASE_SCORE_ONLY, inGameSessionScore } from '../utils/teamTrialScore';
 
 const TRAINER_OVERRIDE_KEY = 'team-umalysis-trainer-name-override';
 const DEBUG_MODE_KEY = 'team-umalysis-debug-mode';
 const SCORE_BONUSES_KEY = 'team-umalysis-score-bonuses';
-const DEFAULT_SCORE_BONUSES: ScoreBonusSettings = {
-    ace: false,
-    opponentRating: false,
-    streak: false,
-    supportCard: false,
-};
 
 type RaceStoreValue = {
     sessions: TTSession[];
@@ -43,6 +37,7 @@ type RaceStoreValue = {
     saveTrainerNameOverride: (value: string) => void;
     setDebugMode: (enabled: boolean) => void;
     setScoreBonusEnabled: (bonus: ScoreBonusKey, enabled: boolean) => void;
+    setAllScoreBonuses: (scoreBonuses: ScoreBonusSettings) => void;
 };
 
 type RaceProgressValue = {
@@ -102,7 +97,7 @@ function loadStoredScoreBonuses(): ScoreBonusSettings {
             supportCard: parsed.supportCard === true,
         };
     } catch {
-        return DEFAULT_SCORE_BONUSES;
+        return BASE_SCORE_ONLY;
     }
 }
 
@@ -126,7 +121,7 @@ function buildIndexEntry(session: TTSession): SessionIndexEntry {
         playerTrainerName: session.playerTrainerName,
         opponentTrainerName: getSessionOpponentTrainer(session),
         supportCardBonus: session.supportCardBonus,
-        totalTeamScore: rawSessionTeamScore(session.rounds),
+        totalTeamScore: inGameSessionScore(session),
         roundsWon: session.rounds.filter((r) => r.playerWonRound).length,
         roundCount: session.rounds.length,
         opponentEvaluate: session.rounds[0]?.opponentEvaluate ?? 0,
@@ -339,6 +334,11 @@ export function RaceStoreProvider({ children }: { children: React.ReactNode }) {
         });
     }, []);
 
+    const setAllScoreBonuses = useCallback((next: ScoreBonusSettings) => {
+        saveStoredScoreBonuses(next);
+        setScoreBonuses(next);
+    }, []);
+
     useEffect(() => {
         if (autoLoadStarted) return;
         autoLoadStarted = true;
@@ -373,6 +373,7 @@ export function RaceStoreProvider({ children }: { children: React.ReactNode }) {
         saveTrainerNameOverride,
         setDebugMode,
         setScoreBonusEnabled,
+        setAllScoreBonuses,
     }), [
         sessions,
         index,
@@ -393,6 +394,7 @@ export function RaceStoreProvider({ children }: { children: React.ReactNode }) {
         saveTrainerNameOverride,
         setDebugMode,
         setScoreBonusEnabled,
+        setAllScoreBonuses,
     ]);
 
     const progressValue = useMemo(() => ({

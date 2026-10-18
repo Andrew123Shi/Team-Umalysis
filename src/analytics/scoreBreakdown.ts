@@ -1,45 +1,20 @@
 import type { ScoreBonusSettings, ScoreBreakdownSummary, ScoreEvent, UmaEntry } from './types';
 import { getSkillRarityCategory } from './skillUtils';
-
-/** Finish position base scores (1st–12th). */
-const FINISH_POSITION_MIN = 60;
-const FINISH_POSITION_MAX = 71;
-
-/** Win margin bonus for the race winner (1st–2nd gap). */
-const WIN_MARGIN_MIN = 1;
-const WIN_MARGIN_MAX = 21;
-
-const GOOD_MID_POSITION_ID = 58;
-const GOOD_LATE_POSITION_ID = 59;
-const STRONG_START_ID = 25;
-
-/** Unique skill activation by level: 40–45 and 50–55 (lv6 down to lv1 in each range). */
-const UNIQUE_SKILL_RANGES: ReadonlyArray<[number, number]> = [[40, 45], [50, 55]];
-
-const GOLD_SKILL_ID = 56;
-const REGULAR_SKILL_ID = 57;
-
-/** Beat standard course time; IDs 72+ encode various time margins. */
-const BEAT_TARGET_TIME_MIN = 72;
-
-const RUSHED_FLAT_ID = 23;
-const RUSHED_PER_SECOND_ID = 24;
-
-function isFinishPositionId(id: number): boolean {
-    return id >= FINISH_POSITION_MIN && id <= FINISH_POSITION_MAX;
-}
-
-function isWinMarginId(id: number): boolean {
-    return id >= WIN_MARGIN_MIN && id <= WIN_MARGIN_MAX;
-}
-
-function isUniqueSkillId(id: number): boolean {
-    return UNIQUE_SKILL_RANGES.some(([min, max]) => id >= min && id <= max);
-}
-
-function isBeatTargetTimeId(id: number): boolean {
-    return id >= BEAT_TARGET_TIME_MIN;
-}
+import {
+    GOLD_SKILL_ID,
+    GOOD_LATE_POSITION_ID,
+    GOOD_MID_POSITION_ID,
+    LONG_SHOT_ID,
+    REGULAR_SKILL_ID,
+    RUSHED_FLAT_ID,
+    RUSHED_PER_SECOND_ID,
+    STRONG_START_ID,
+    isBeatTargetTimeId,
+    isFinishPositionId,
+    isUniqueSkillId,
+    isWinMarginId,
+} from './scoreIds';
+import { BASE_SCORE_ONLY, scoreEventValue } from '../utils/teamTrialScore';
 
 export function countLearnedSkills(entry: UmaEntry): { gold: number; regular: number; unique: number } {
     let gold = 0;
@@ -84,19 +59,6 @@ export function countSkillActivations(entry: UmaEntry): { gold: number; regular:
     return { gold, regular, unique };
 }
 
-export function scoreEventBaseScore(event: ScoreEvent): number {
-    if (Number.isFinite(event.baseScore)) return event.baseScore;
-    return event.score;
-}
-
-function scoreEventDisplayScore(event: ScoreEvent, bonuses: ScoreBonusSettings): number {
-    return scoreEventBaseScore(event)
-        + (bonuses.ace ? (event.bonusScores?.ace ?? 0) : 0)
-        + (bonuses.opponentRating ? (event.bonusScores?.opponentRating ?? 0) : 0)
-        + (bonuses.streak ? (event.bonusScores?.streak ?? 0) : 0)
-        + (bonuses.supportCard ? (event.bonusScores?.supportCard ?? 0) : 0);
-}
-
 function uniqueSkillActivationPoints(entry: UmaEntry): number {
     const uniqueLevels = new Map(
         entry.skills
@@ -120,6 +82,8 @@ export type RaceScoreBreakdown = {
     goodLatePositionScore: number;
     hasStrongStart: boolean;
     strongStartScore: number;
+    hasLongShot: boolean;
+    longShotScore: number;
     goldSkillPoints: number;
     regularSkillPoints: number;
     uniqueSkillPoints: number;
@@ -133,7 +97,7 @@ export type RaceScoreBreakdown = {
 
 export function breakdownRaceScoreEvents(
     events: ScoreEvent[],
-    bonuses: ScoreBonusSettings = { ace: false, opponentRating: false, streak: false, supportCard: false },
+    bonuses: ScoreBonusSettings = BASE_SCORE_ONLY,
 ): RaceScoreBreakdown {
     const result: RaceScoreBreakdown = {
         finishPositionScore: 0,
@@ -144,6 +108,8 @@ export function breakdownRaceScoreEvents(
         goodLatePositionScore: 0,
         hasStrongStart: false,
         strongStartScore: 0,
+        hasLongShot: false,
+        longShotScore: 0,
         goldSkillPoints: 0,
         regularSkillPoints: 0,
         uniqueSkillPoints: 0,
@@ -156,7 +122,7 @@ export function breakdownRaceScoreEvents(
     };
 
     events.forEach((event) => {
-        const base = scoreEventDisplayScore(event, bonuses);
+        const base = scoreEventValue(event, bonuses);
         const id = event.rawScoreId;
 
         if (isFinishPositionId(id)) {
@@ -180,6 +146,11 @@ export function breakdownRaceScoreEvents(
         if (id === STRONG_START_ID) {
             result.hasStrongStart = true;
             result.strongStartScore += base;
+            return;
+        }
+        if (id === LONG_SHOT_ID) {
+            result.hasLongShot = true;
+            result.longShotScore += base;
             return;
         }
         if (isUniqueSkillId(id)) {
@@ -218,7 +189,7 @@ export function breakdownRaceScoreEvents(
 
 export function aggregateScoreBreakdown(
     entries: UmaEntry[],
-    bonuses: ScoreBonusSettings = { ace: false, opponentRating: false, streak: false, supportCard: false },
+    bonuses: ScoreBonusSettings = BASE_SCORE_ONLY,
 ): ScoreBreakdownSummary | null {
     if (entries.length === 0) return null;
 
@@ -232,6 +203,8 @@ export function aggregateScoreBreakdown(
     let goodLateTotal = 0;
     let strongStartCount = 0;
     let strongStartTotal = 0;
+    let longShotCount = 0;
+    let longShotTotal = 0;
     let goldSkillTotal = 0;
     let regularSkillTotal = 0;
     let uniqueSkillTotal = 0;
@@ -264,6 +237,8 @@ export function aggregateScoreBreakdown(
         goodLateTotal += race.goodLatePositionScore;
         if (race.hasStrongStart) strongStartCount += 1;
         strongStartTotal += race.strongStartScore;
+        if (race.hasLongShot) longShotCount += 1;
+        longShotTotal += race.longShotScore;
         const activations = countSkillActivations(entry);
         const learned = countLearnedSkills(entry);
         goldSkillTotal += race.goldSkillPoints;
@@ -311,6 +286,8 @@ export function aggregateScoreBreakdown(
         avgGoodLatePositionBonus: goodLateTotal / raceCount,
         strongStartRate: strongStartCount / raceCount,
         avgStrongStartBonus: strongStartTotal / raceCount,
+        longShotRate: longShotCount / raceCount,
+        avgLongShotBonus: longShotTotal / raceCount,
         avgUniqueSkillActivations: totalUniqueSkillActivations / raceCount,
         uniqueSkillActivationRate: totalUniqueSkillChances > 0
             ? totalUniqueSkillActivations / totalUniqueSkillChances

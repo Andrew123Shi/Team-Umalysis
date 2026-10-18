@@ -75,13 +75,19 @@ export default function ScoreBreakdownPanel({ breakdown }: { breakdown: ScoreBre
             label: 'Good Positioning Rate, Mid-Race',
             value: fmtPct(breakdown.goodMidPositionRate),
             score: formatScore(breakdown.avgGoodMidPositionBonus),
-            detail: 'Share of races with the good mid-race positioning bonus',
+            detail: 'Share of races the uma was leading amongst all runners with the same style entering mid-race ',
         },
         {
             label: 'Good Positioning Rate, Late-Race',
             value: fmtPct(breakdown.goodLatePositionRate),
             score: formatScore(breakdown.avgGoodLatePositionBonus),
-            detail: 'Share of races with the good late-race positioning bonus',
+            detail: 'Share of races the uma was leading amongst all runners with the same style entering late-race',
+        },
+        {
+            label: 'Long Shot Rate',
+            value: fmtPct(breakdown.longShotRate),
+            score: formatScore(breakdown.avgLongShotBonus),
+            detail: 'Share of races finishing top 3 as the 8th favorite or lower',
         },
         {
             label: 'Unique Skill Activation Rate',

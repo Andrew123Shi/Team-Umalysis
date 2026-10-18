@@ -2,13 +2,7 @@ import { aggregateScoreBreakdown, countLearnedSkills, countSkillActivations } fr
 import type { ScoreBonusSettings, ScoreBreakdownSummary, TTSession, UmaComparisonEntry, UmaEntry } from './types';
 import { buildUmaFingerprint } from './umaIdentity';
 import { DISTANCE_ORDER } from './types';
-
-const DEFAULT_SCORE_BONUSES: ScoreBonusSettings = {
-    ace: false,
-    opponentRating: false,
-    streak: false,
-    supportCard: false,
-};
+import { BASE_SCORE_ONLY, umaScore } from '../utils/teamTrialScore';
 
 function primaryDistanceType(counts: Map<number, number>): number {
     let bestType: number = DISTANCE_ORDER[0];
@@ -20,18 +14,6 @@ function primaryDistanceType(counts: Map<number, number>): number {
         }
     });
     return bestType;
-}
-
-function umaDisplayScore(uma: UmaEntry, bonuses: ScoreBonusSettings): number {
-    const baseScore = Number.isFinite(uma.totalBaseScore) ? uma.totalBaseScore : uma.totalScore;
-    const eventBonusTotal = uma.scoreEvents.reduce((sum, event) => (
-        sum
-        + (bonuses.ace ? (event.bonusScores?.ace ?? 0) : 0)
-        + (bonuses.opponentRating ? (event.bonusScores?.opponentRating ?? 0) : 0)
-        + (bonuses.streak ? (event.bonusScores?.streak ?? 0) : 0)
-        + (bonuses.supportCard ? (event.bonusScores?.supportCard ?? 0) : 0)
-    ), 0);
-    return baseScore + eventBonusTotal;
 }
 
 function emptyBreakdown(): ScoreBreakdownSummary {
@@ -49,6 +31,8 @@ function emptyBreakdown(): ScoreBreakdownSummary {
         avgGoodLatePositionBonus: 0,
         strongStartRate: 0,
         avgStrongStartBonus: 0,
+        longShotRate: 0,
+        avgLongShotBonus: 0,
         avgRegularSkillActivations: 0,
         regularSkillActivationRate: 0,
         avgRegularSkillPoints: 0,
@@ -109,7 +93,7 @@ export function buildUmaComparisonEntries(
 ): UmaComparisonEntry[] {
     if (sessions.length === 0) return [];
 
-    const bonuses = options?.scoreBonuses ?? DEFAULT_SCORE_BONUSES;
+    const bonuses = options?.scoreBonuses ?? BASE_SCORE_ONLY;
     const rosterKeys = getCurrentRosterBuildKeys(sessions);
     const map = new Map<string, {
         buildKey: string;
@@ -144,7 +128,7 @@ export function buildUmaComparisonEntries(
                     lastSeenAt: null,
                 };
                 entry.entries.push(player);
-                entry.scoreValues.push(umaDisplayScore(player, bonuses));
+                entry.scoreValues.push(umaScore(player, bonuses));
                 if (player.finishOrder === 1) entry.wins += 1;
                 entry.distanceCounts.set(
                     round.distanceType,

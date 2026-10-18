@@ -24,7 +24,7 @@ export type ScoreEvent = {
     rawScoreId: number;
     num: number;
     score: number;
-    /** Base score before ace / opponent / streak / support bonuses. */
+    /** score minus every bonus in bonusScores. */
     baseScore: number;
     bonusScores: ScoreBonusBreakdown;
 };
@@ -45,6 +45,9 @@ export type ScoreBreakdownSummary = {
     avgGoodLatePositionBonus: number;
     strongStartRate: number;
     avgStrongStartBonus: number;
+    /** Top-3 finishes at popularity 8 or lower. */
+    longShotRate: number;
+    avgLongShotBonus: number;
     avgRegularSkillActivations: number;
     regularSkillActivationRate: number;
     avgRegularSkillPoints: number;
@@ -146,6 +149,8 @@ export type TTSession = {
     opponentTrainerName: string;
     supportCardBonus: number;
     rounds: TTRound[];
+    /** Session victory bonus (3+ races won); null when the session was lost. */
+    victoryBonus: ScoreEvent | null;
 };
 
 export type SessionIndexEntry = {
@@ -286,10 +291,14 @@ export type AggregatedStats = {
     sessionWinRate: number;
     placement: NumericSummary;
     score: NumericSummary;
+    /** Session totals (races + victory bonus) using the score bonus settings. */
     raceScoreTotal: NumericSummary;
-    raceScoreTotalRaw: NumericSummary;
+    /** Session totals exactly as shown in game. */
+    raceScoreTotalInGame: NumericSummary;
+    /** Per-race scores using the score bonus settings. */
     teamScore: NumericSummary;
-    teamScoreRaw: NumericSummary;
+    /** Per-race scores exactly as shown in game (team_total_score). */
+    teamScoreInGame: NumericSummary;
     winRate: number;
     top2Rate: number;
     top3Rate: number;
