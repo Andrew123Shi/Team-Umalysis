@@ -1,22 +1,16 @@
-import { useMemo } from 'react';
-import ReactECharts from 'echarts-for-react';
-
+import { memo, useMemo } from 'react';
+import type { AggregatedStats, NumericSummary } from '../../analytics/types';
 import AssetLoader from '../../data/AssetLoader';
+import { AnimatedText } from '../AnimatedNumber';
 import RatingDisplay from '../RatingDisplay';
 import TeamRatingDisplay from '../TeamRatingDisplay';
-import { chartTooltipStyle } from './chartTooltip';
-import { BAR_CHART_GRID, BAR_CHART_HEIGHT, CHART_UPDATE_ANIMATION } from './chartLayout';
+import CompareGrid, { type CompareColumn, type CompareRow } from './CompareGrid';
+import { rangeTip } from './RangeTrack';
 
-type StatValues = {
-    speed: number;
-    stamina: number;
-    pow: number;
-    guts: number;
-    wiz: number;
-};
+type StatKey = 'speed' | 'stamina' | 'pow' | 'guts' | 'wiz';
 
 type AverageStatsSummary = {
-    stats: StatValues;
+    stats: Record<StatKey, NumericSummary>;
     rankScore: number;
     teamRating?: number;
 };
@@ -29,155 +23,96 @@ const STAT_META = [
     { key: 'wiz', label: 'Wit', icon: 'wit', color: '#07c282' },
 ] as const;
 
-function statValues(stats: StatValues): number[] {
-    return [stats.speed, stats.stamina, stats.pow, stats.guts, stats.wiz];
+/** Whisker domains snap to this step, and the track draws a tick at each step. */
+const STAT_TICK_STEP = 200;
+
+function signed(value: number): string {
+    const rounded = Math.round(value);
+    if (rounded === 0) return '±0';
+    const magnitude = Math.abs(rounded).toLocaleString();
+    return rounded > 0 ? `+${magnitude}` : `−${magnitude}`;
 }
 
-function buildOption(title: string, stats: StatValues) {
-    const values = statValues(stats);
-    const maxValue = Math.max(...values, 1200);
-    const yMax = Math.ceil(maxValue / 200) * 200;
+const roundStat = (value: number) => String(Math.round(value));
 
-    return {
-        backgroundColor: 'transparent',
-        ...CHART_UPDATE_ANIMATION,
-        title: {
-            text: title,
-            left: 'center',
-            top: 0,
-            textStyle: { color: '#e6edf7', fontSize: 13, fontWeight: 700 },
-        },
-        tooltip: {
-            ...chartTooltipStyle,
-            trigger: 'axis',
-            axisPointer: { type: 'shadow' },
-            formatter: (params: unknown) => {
-                const items = (Array.isArray(params) ? params : [params]) as {
-                    axisValue?: string;
-                    marker?: string;
-                    value?: number;
-                }[];
-                const item = items[0];
-                if (!item) return '';
-                const meta = STAT_META.find((stat) => stat.key === item.axisValue);
-                return `<b>${meta?.label ?? item.axisValue ?? ''}</b><br/><b>${item.marker ?? ''}${Math.round(item.value ?? 0)}</b>`;
-            },
-        },
-        grid: { ...BAR_CHART_GRID },
-        xAxis: {
-            type: 'category',
-            data: STAT_META.map((stat) => stat.key),
-            axisTick: { show: false },
-            axisLabel: {
-                interval: 0,
-                formatter: (value: string) => `{${value}|}`,
-                rich: Object.fromEntries(STAT_META.map((stat) => [
-                    stat.key,
-                    {
-                        width: 22,
-                        height: 22,
-                        align: 'center',
-                        backgroundColor: {
-                            image: AssetLoader.getStatIcon(stat.icon),
-                        },
-                    },
-                ])),
-            },
-            axisLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.16)' } },
-        },
-        yAxis: {
-            type: 'value',
-            min: 0,
-            max: yMax,
-            axisLabel: { color: '#9aa7b5', fontSize: 10 },
-            splitLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.08)' } },
-        },
-        series: [{
-            type: 'bar',
-            barWidth: '52%',
-            showBackground: true,
-            backgroundStyle: {
-                color: 'rgba(9, 13, 20, 0.34)',
-                borderRadius: [10, 10, 4, 4],
-            },
-            label: {
-                show: true,
-                position: 'top',
-                color: '#e6edf7',
-                fontSize: 10,
-                fontWeight: 700,
-                formatter: ({ value }: { value: number }) => Math.round(value).toString(),
-            },
-            data: values.map((value, index) => {
-                const color = STAT_META[index].color;
-                return {
-                    value,
-                    itemStyle: {
-                        color: {
-                            type: 'linear',
-                            x: 0,
-                            y: 0,
-                            x2: 0,
-                            y2: 1,
-                            colorStops: [
-                                { offset: 0, color },
-                                { offset: 1, color: `${color}99` },
-                            ],
-                        },
-                        borderRadius: [10, 10, 4, 4],
-                        shadowBlur: 10,
-                        shadowColor: `${color}2e`,
-                        shadowOffsetY: 4,
-                    },
-                };
-            }),
-        }],
+function AverageStatsComparisonChart({
+    stats,
+    showTeamRating = true,
+}: {
+    stats: AggregatedStats;
+    showTeamRating?: boolean;
+}) {
+    const opponent: AverageStatsSummary = {
+        stats: stats.opponentStats,
+        rankScore: stats.opponentStats.rankScore.avg,
+        teamRating: stats.opponentStats.teamRating.avg,
     };
-}
+    const npc: AverageStatsSummary = {
+        stats: stats.npcStats,
+        rankScore: stats.npcStats.rankScore.avg,
+    };
+    const rows = useMemo<CompareRow[]>(() => {
+        // One domain for every stat so whiskers compare across rows as well as columns.
+        const summaries = STAT_META.flatMap((stat) => [opponent.stats[stat.key], npc.stats[stat.key]])
+            .filter((summary) => summary.count > 0);
+        const low = Math.min(...summaries.map((summary) => summary.min));
+        const high = Math.max(...summaries.map((summary) => summary.max));
+        const domainMin = Number.isFinite(low) ? Math.floor(low / STAT_TICK_STEP) * STAT_TICK_STEP : 0;
+        const domainMax = Number.isFinite(high)
+            ? Math.max(domainMin + STAT_TICK_STEP, Math.ceil(high / STAT_TICK_STEP) * STAT_TICK_STEP)
+            : 1200;
+        const ticks = (domainMax - domainMin) / STAT_TICK_STEP + 1;
+        const cell = (group: string, label: string, color: string, summary: NumericSummary) => ({
+            fraction: 0,
+            range: {
+                min: summary.min,
+                max: summary.max,
+                avg: summary.avg,
+                median: summary.median,
+                domainMin,
+                domainMax,
+                ticks,
+            },
+            value: roundStat(summary.avg),
+            tip: rangeTip(`${group} · ${label}`, summary, roundStat, { color }),
+        });
+        return STAT_META.map((stat) => {
+            const opp = opponent.stats[stat.key];
+            const base = npc.stats[stat.key];
+            return {
+                key: stat.key,
+                label: stat.label,
+                icon: AssetLoader.getStatIcon(stat.icon),
+                color: stat.color,
+                cells: [cell('Opponents', stat.label, stat.color, opp), cell('NPCs', stat.label, stat.color, base)],
+                aside: <span className="cmp-delta"><AnimatedText text={signed(opp.avg - base.avg)} /></span>,
+            };
+        });
+    }, [opponent.stats, npc.stats]);
 
-function AverageStatsChart({
-    title,
-    summary,
-    showTeamRating = true,
-}: {
-    title: string;
-    summary: AverageStatsSummary;
-    showTeamRating?: boolean;
-}) {
-    const option = useMemo(() => buildOption(title, summary.stats), [summary.stats, title]);
-
-    return (
-        <div className="average-stats-chart-block h-100">
-            <ReactECharts option={option} style={{ height: BAR_CHART_HEIGHT }} />
-            <div className={`average-stats-chart-footer${showTeamRating ? ' average-stats-chart-footer--opponent' : ''}`}>
-                <RatingDisplay rankScore={summary.rankScore} label="Avg. Uma Rating" />
-                {showTeamRating && summary.teamRating !== undefined && (
-                    <TeamRatingDisplay teamRating={summary.teamRating} label="Avg. Team Rating" />
-                )}
-            </div>
-        </div>
+    const umaRating = (rankScore: number) => (
+        <span className="cmp-rating is-uma">
+            <small>Uma rating</small>
+            <RatingDisplay rankScore={rankScore} showLabel={false} />
+        </span>
     );
+
+    const columns: CompareColumn[] = [
+        {
+            key: 'opponent',
+            title: 'Opponents',
+            metaCenter: showTeamRating && opponent.teamRating !== undefined ? (
+                <span className="cmp-rating is-team">
+                    <small>Team rating</small>
+                    <TeamRatingDisplay teamRating={opponent.teamRating} showLabel={false} />
+                </span>
+            ) : null,
+            metaEnd: umaRating(opponent.rankScore),
+        },
+        { key: 'npc', title: 'NPCs', metaEnd: umaRating(npc.rankScore) },
+    ];
+
+    return <CompareGrid columns={columns} rows={rows} asideTitle="Δ" />;
 }
 
-export default function AverageStatsComparisonChart({
-    opponent,
-    npc,
-    showTeamRating = true,
-}: {
-    opponent: AverageStatsSummary;
-    npc: AverageStatsSummary;
-    showTeamRating?: boolean;
-}) {
-    return (
-        <div className="opponent-bar-chart-panel">
-            <div className="row g-3 average-stats-chart-row opponent-bar-chart-row">
-                <div className="col-lg-6">
-                    <AverageStatsChart title="Average Opponent Stats" summary={opponent} showTeamRating={showTeamRating} />
-                </div>
-                <div className="col-lg-6">
-                    <AverageStatsChart title="Average NPC Stats" summary={npc} showTeamRating={false} />
-                </div>
-            </div>
-        </div>
-    );
-}
+export default memo(AverageStatsComparisonChart);

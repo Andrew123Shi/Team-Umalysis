@@ -1,280 +1,91 @@
-import { useMemo, useState } from 'react';
-import { COL_THIRD } from '../layout';
-import ReactECharts from 'echarts-for-react';
-import { Button, ButtonGroup } from 'react-bootstrap';
+import { memo, useMemo } from 'react';
 import type { StyleComposition } from '../../analytics/types';
 import { STYLE_SATURATION_COLORS } from '../../analytics/styleSaturation';
-import { chartTooltipStyle } from './chartTooltip';
-import { BAR_CHART_GRID, CHART_UPDATE_ANIMATION, STYLE_COMPOSITION_CHART_HEIGHT } from './chartLayout';
+import AssetLoader from '../../data/AssetLoader';
+import CompareGrid, { type CompareColumn, type CompareRow } from './CompareGrid';
 
-type Mode = 'percent' | 'avgCount';
+/** Runaway has no style icon in game, so it borrows the Runaway skill's icon. */
+const RUNAWAY_SKILL_ICON = AssetLoader.getSkillIcon(40012, 'Green');
 
-const STYLE_AXIS_LABELS = ['Front /\nRunaway', 'Pace', 'Late', 'End'] as const;
-const STYLE_LABELS = ['Front/Runaway', 'Pace', 'Late', 'End'] as const;
-const STYLE_IDS = [1, 2, 3, 4] as const;
+const STYLES = [
+    { key: 'runaway', label: 'Runaway', icon: RUNAWAY_SKILL_ICON, color: STYLE_SATURATION_COLORS[5] },
+    { key: 'front', label: 'Front', icon: AssetLoader.getStatIcon('front'), color: STYLE_SATURATION_COLORS[1] },
+    { key: 'pace', label: 'Pace', icon: AssetLoader.getStatIcon('pace'), color: STYLE_SATURATION_COLORS[2] },
+    { key: 'late', label: 'Late', icon: AssetLoader.getStatIcon('late'), color: STYLE_SATURATION_COLORS[3] },
+    { key: 'end', label: 'End', icon: AssetLoader.getStatIcon('end'), color: STYLE_SATURATION_COLORS[4] },
+] as const;
 
-function fmtCount(value: number): string {
-    return (Math.round(value * 100) / 100).toFixed(2);
-}
-
-function fmtPctFraction(fraction: number): string {
-    return `${(Math.round(fraction * 1000) / 10).toFixed(1)}%`;
-}
-
-function dualLabel(countVal: number, pctFraction: number, mode: Mode): string {
-    const count = fmtCount(countVal);
-    const pct = fmtPctFraction(pctFraction);
-    return mode === 'avgCount' ? `${count} (${pct})` : `${pct} (${count})`;
-}
-
-function compValues(comp: StyleComposition) {
-    return [comp.front, comp.pace, comp.late, comp.end];
-}
-
-function formatBarLabel(value: number, mode: Mode): string {
-    return mode === 'percent'
-        ? `${(Math.round(value * 10) / 10).toFixed(1)}%`
-        : (Math.round(value * 100) / 100).toFixed(2);
-}
-
-function buildOption({
-    title,
-    comp,
-    altComp,
-    mode,
-    showDual = false,
-}: {
+type Group = {
+    key: string;
     title: string;
-    comp: StyleComposition;
-    altComp?: StyleComposition;
-    mode: Mode;
-    showDual?: boolean;
-}) {
-    const primary = compValues(comp);
-    const alternate = altComp ? compValues(altComp) : primary;
+    share: StyleComposition;
+    avgCount?: StyleComposition;
+};
 
-    const values = mode === 'percent'
-        ? primary.map((v) => v * 100)
-        : primary;
-    const dataMax = Math.max(...values, 0);
-    const seriesData = values.map((value, index) => {
-        const color = STYLE_SATURATION_COLORS[STYLE_IDS[index]] ?? '#6ea8fe';
-        return {
-            value,
-            itemStyle: {
-                color: {
-                    type: 'linear',
-                    x: 0,
-                    y: 0,
-                    x2: 0,
-                    y2: 1,
-                    colorStops: [
-                        { offset: 0, color },
-                        { offset: 1, color: `${color}99` },
-                    ],
-                },
-                borderRadius: [10, 10, 4, 4],
-                shadowBlur: 10,
-                shadowColor: `${color}2e`,
-                shadowOffsetY: 4,
-            },
-        };
-    });
-
-    const yMin = 0;
-    const yMax = mode === 'percent'
-        ? Math.max(10, Math.ceil(dataMax / 10) * 10)
-        : Math.max(1, Math.ceil(dataMax));
-
-    return {
-        backgroundColor: 'transparent',
-        ...CHART_UPDATE_ANIMATION,
-        title: {
-            text: title,
-            left: 'center',
-            top: 0,
-            textStyle: { color: '#e6edf7', fontSize: 13, fontWeight: 700 },
-        },
-        tooltip: {
-            ...chartTooltipStyle,
-            trigger: 'axis',
-            axisPointer: { type: 'shadow' },
-            formatter: (params: unknown) => {
-                const items = (Array.isArray(params) ? params : [params]) as {
-                    dataIndex?: number;
-                    marker?: string;
-                    seriesName?: string;
-                }[];
-                const item = items[0];
-                if (!item || item.dataIndex == null) return '';
-
-                const idx = item.dataIndex;
-                const label = STYLE_LABELS[idx] ?? '';
-                const countVal = mode === 'avgCount' ? primary[idx] : alternate[idx];
-                const pctFraction = mode === 'percent' ? primary[idx] : alternate[idx];
-
-                const valueText = showDual
-                    ? dualLabel(countVal, pctFraction, mode)
-                    : (mode === 'percent' ? fmtPctFraction(primary[idx]) : fmtCount(primary[idx]));
-
-                return [
-                    `<b>${label}</b>`,
-                    `<b><span style="display:inline-flex;align-items:baseline;gap:6px">`
-                    + `<span>${item.marker ?? ''}</span>`
-                    + `<span style="text-align:left">${valueText}</span>`
-                    + `</span></b>`,
-                ].join('<br/>');
-            },
-        },
-        grid: { ...BAR_CHART_GRID },
-        xAxis: {
-            type: 'category',
-            data: [...STYLE_AXIS_LABELS],
-            axisTick: { show: false },
-            axisLabel: {
-                color: '#ced4da',
-                fontSize: 10,
-                interval: 0,
-                lineHeight: 13,
-            },
-            axisLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.16)' } },
-        },
-        yAxis: {
-            type: 'value',
-            name: mode === 'percent' ? '%' : 'Avg count',
-            min: yMin,
-            max: yMax,
-            axisLabel: { color: '#9aa7b5', fontSize: 10 },
-            splitLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.08)' } },
-        },
-        series: [{
-            type: 'bar',
-            barWidth: '52%',
-            showBackground: true,
-            backgroundStyle: {
-                color: 'rgba(9, 13, 20, 0.34)',
-                borderRadius: [10, 10, 4, 4],
-            },
-            label: {
-                show: true,
-                position: 'top',
-                color: '#e6edf7',
-                fontSize: 10,
-                fontWeight: 700,
-                formatter: ({ value }: { value: number }) => formatBarLabel(value, mode),
-            },
-            data: seriesData,
-            emphasis: {
-                itemStyle: {
-                    shadowBlur: 16,
-                    shadowOffsetY: 5,
-                    shadowColor: 'rgba(255, 255, 255, 0.16)',
-                },
-            },
-        }],
-    };
+function pct(fraction: number): string {
+    return `${(fraction * 100).toFixed(1)}%`;
 }
 
-export default function StyleCompositionChart({
+/** Shared scale: the largest share across all groups, rounded up to the next 10%. */
+function shareScale(groups: Group[]): number {
+    const peak = Math.max(...groups.flatMap((group) => STYLES.map((style) => group.share[style.key])), 0);
+    return Math.max(0.1, Math.ceil(peak * 10) / 10);
+}
+
+function StyleCompositionChart({
     opponent,
+    opponentAvgCount,
     npcPercent,
     npcAvgCount,
     roomPercent,
     roomAvgCount,
 }: {
     opponent: StyleComposition;
+    opponentAvgCount: StyleComposition;
     npcPercent: StyleComposition;
     npcAvgCount: StyleComposition;
     roomPercent: StyleComposition;
     roomAvgCount: StyleComposition;
 }) {
-    const [npcMode, setNpcMode] = useState<Mode>('avgCount');
-    const [roomMode, setRoomMode] = useState<Mode>('avgCount');
+    const { columns, rows } = useMemo(() => {
+        const groups: Group[] = [
+            { key: 'opponent', title: 'Opponent Team', share: opponent, avgCount: opponentAvgCount },
+            { key: 'npc', title: 'NPCs', share: npcPercent, avgCount: npcAvgCount },
+            { key: 'room', title: 'Full Field', share: roomPercent, avgCount: roomAvgCount },
+        ];
+        const scaleMax = shareScale(groups);
+        const gridColumns: CompareColumn[] = groups.map((group) => ({
+            key: group.key,
+            title: group.title,
+            strip: STYLES.map((style) => ({ label: style.label, value: group.share[style.key], color: style.color })),
+        }));
+        const gridRows: CompareRow[] = STYLES.map((style) => ({
+            key: style.key,
+            label: style.label,
+            icon: style.icon,
+            color: style.color,
+            cells: groups.map((group) => {
+                const share = group.share[style.key];
+                const count = group.avgCount?.[style.key];
+                return {
+                    fraction: share / scaleMax,
+                    value: pct(share),
+                    sub: count !== undefined ? `${count.toFixed(2)} avg` : undefined,
+                    tip: {
+                        head: `${group.title} · ${style.label}`,
+                        color: style.color,
+                        rows: [
+                            { label: 'Share', value: pct(share) },
+                            ...(count !== undefined ? [{ label: 'Per Race', value: count.toFixed(2) }] : []),
+                        ],
+                    },
+                };
+            }),
+        }));
+        return { columns: gridColumns, rows: gridRows };
+    }, [opponent, opponentAvgCount, npcPercent, npcAvgCount, roomPercent, roomAvgCount]);
 
-    const npcComp = npcMode === 'percent' ? npcPercent : npcAvgCount;
-    const npcAlt = npcMode === 'percent' ? npcAvgCount : npcPercent;
-    const roomComp = roomMode === 'percent' ? roomPercent : roomAvgCount;
-    const roomAlt = roomMode === 'percent' ? roomAvgCount : roomPercent;
-
-    const oppOption = useMemo(
-        () => buildOption({ title: 'Opponent Team', comp: opponent, mode: 'percent' }),
-        [opponent],
-    );
-    const npcOption = useMemo(
-        () => buildOption({
-            title: 'NPCs',
-            comp: npcComp,
-            altComp: npcAlt,
-            mode: npcMode,
-            showDual: true,
-        }),
-        [npcComp, npcAlt, npcMode],
-    );
-    const roomOption = useMemo(
-        () => buildOption({
-            title: 'Full Field',
-            comp: roomComp,
-            altComp: roomAlt,
-            mode: roomMode,
-            showDual: true,
-        }),
-        [roomComp, roomAlt, roomMode],
-    );
-
-    return (
-        <div className="opponent-bar-chart-panel">
-            <div className="row g-3 opponent-bar-chart-toolbar-row">
-                <div className={COL_THIRD}>
-                    <div className="composition-chart-toolbar" />
-                </div>
-                <div className={COL_THIRD}>
-                    <div className="composition-chart-toolbar">
-                        <ButtonGroup size="sm">
-                            <Button
-                                variant={npcMode === 'avgCount' ? 'secondary' : 'outline-secondary'}
-                                onClick={() => setNpcMode('avgCount')}
-                            >
-                                Avg Count
-                            </Button>
-                            <Button
-                                variant={npcMode === 'percent' ? 'secondary' : 'outline-secondary'}
-                                onClick={() => setNpcMode('percent')}
-                            >
-                                Percent
-                            </Button>
-                        </ButtonGroup>
-                    </div>
-                </div>
-                <div className={COL_THIRD}>
-                    <div className="composition-chart-toolbar">
-                        <ButtonGroup size="sm">
-                            <Button
-                                variant={roomMode === 'avgCount' ? 'secondary' : 'outline-secondary'}
-                                onClick={() => setRoomMode('avgCount')}
-                            >
-                                Avg Count
-                            </Button>
-                            <Button
-                                variant={roomMode === 'percent' ? 'secondary' : 'outline-secondary'}
-                                onClick={() => setRoomMode('percent')}
-                            >
-                                Percent
-                            </Button>
-                        </ButtonGroup>
-                    </div>
-                </div>
-            </div>
-            <div className="row g-3 average-stats-chart-row opponent-bar-chart-row">
-                <div className={COL_THIRD}>
-                    <ReactECharts option={oppOption} style={{ height: STYLE_COMPOSITION_CHART_HEIGHT }} />
-                </div>
-                <div className={COL_THIRD}>
-                    <ReactECharts option={npcOption} style={{ height: STYLE_COMPOSITION_CHART_HEIGHT }} />
-                </div>
-                <div className={COL_THIRD}>
-                    <ReactECharts option={roomOption} style={{ height: STYLE_COMPOSITION_CHART_HEIGHT }} />
-                </div>
-            </div>
-        </div>
-    );
+    return <CompareGrid columns={columns} rows={rows} />;
 }
+
+export default memo(StyleCompositionChart);

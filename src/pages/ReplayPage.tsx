@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
-import { Alert, Button, ButtonGroup, Col, Form, ListGroup, Row, Spinner } from 'react-bootstrap';
+import { Alert, Button, ButtonGroup, Form, Spinner } from 'react-bootstrap';
 import RaceDataPresenter from '../components/RaceDataPresenter';
+import { deserializeFromBase64 } from '../data/RaceDataParser';
 import PriorityFilesLoadingAlert from '../components/PriorityFilesLoadingAlert';
 import RemainingFilesLoadingAlert from '../components/RemainingFilesLoadingAlert';
 import { DISTANCE_LABELS, type SessionIndexEntry, type TTRound } from '../analytics/types';
@@ -23,12 +24,6 @@ function formatTrialLabel(entry: SessionIndexEntry, opponentTrainerName: string)
 
 function isSessionVictory(roundsWon: number, roundCount: number): boolean {
     return roundsWon > roundCount / 2;
-}
-
-function formatSessionOutcome(entry: SessionIndexEntry): string {
-    const won = isSessionVictory(entry.roundsWon, entry.roundCount);
-    const label = won ? 'Victory' : 'Loss';
-    return `${label} ${entry.roundsWon}/${entry.roundCount} · ${formatScore(entry.totalTeamScore)} pts`;
 }
 
 function formatReplayRoundDescription(round: TTRound): string {
@@ -67,6 +62,10 @@ export default function ReplayPage() {
     );
 
     const round = session?.rounds[selectedRound];
+    const raceData = useMemo(
+        () => (round ? deserializeFromBase64(round.parsedRace.raceScenario) : null),
+        [round],
+    );
 
     if (loading && !sessions.length) {
         return (
@@ -103,62 +102,73 @@ export default function ReplayPage() {
     return (
         <div className="page-shell">
             <RemainingFilesLoadingAlert />
-            <Row className="replay-layout">
-                <Col md={3}>
-                    <div className="replay-sidebar-card p-3">
-                        <SectionHeading title="Trials Database" compact className="mt-0" />
-                        <Form.Control
-                            type="search"
-                            placeholder="Search Saved Trials"
-                            value={filter}
-                            onChange={(e) => setFilter(e.target.value)}
-                            className="mb-3"
-                        />
-                        <ListGroup variant="flush" className="replay-trial-list" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
-                            {filteredIndex.map((entry) => {
-                                const won = isSessionVictory(entry.roundsWon, entry.roundCount);
-                                return (
-                                    <ListGroup.Item
-                                        key={entry.id}
-                                        action
-                                        active={entry.id === selectedSessionId}
-                                        onClick={() => { setSelectedSessionId(entry.id); setSelectedRound(0); }}
-                                        className={`replay-trial-item ${won ? 'replay-trial-item--win' : 'replay-trial-item--loss'}`}
-                                    >
-                                        <div className="small replay-trial-item-title">
-                                            {formatTrialLabel(entry, opponentTrainerBySessionId.get(entry.id) ?? entry.opponentTrainerName ?? '')}
-                                        </div>
-                                        <div className={`small replay-trial-item-outcome ${won ? 'replay-trial-item-outcome--win' : 'replay-trial-item-outcome--loss'}`}>
-                                            {formatSessionOutcome(entry)}
-                                        </div>
-                                    </ListGroup.Item>
-                                );
-                            })}
-                        </ListGroup>
+            <div className="replay-layout">
+                <aside className="app-card replay-sidebar-card">
+                    <SectionHeading
+                        title="Trials"
+                        actions={<span className="replay-trial-count">{filteredIndex.length}</span>}
+                    />
+                    <Form.Control
+                        type="search"
+                        size="sm"
+                        placeholder="Search date, opponent, file…"
+                        value={filter}
+                        onChange={(e) => setFilter(e.target.value)}
+                        className="replay-search"
+                    />
+                    <div className="replay-trial-list" role="listbox" aria-label="Saved trials">
+                        {filteredIndex.map((entry) => {
+                            const won = isSessionVictory(entry.roundsWon, entry.roundCount);
+                            const active = entry.id === selectedSessionId;
+                            return (
+                                <button
+                                    key={entry.id}
+                                    type="button"
+                                    role="option"
+                                    aria-selected={active}
+                                    onClick={() => { setSelectedSessionId(entry.id); setSelectedRound(0); }}
+                                    className={`replay-trial-item ${won ? 'replay-trial-item--win' : 'replay-trial-item--loss'}${active ? ' active' : ''}`}
+                                >
+                                    <span className="replay-trial-item-title">
+                                        {formatTrialLabel(entry, opponentTrainerBySessionId.get(entry.id) ?? entry.opponentTrainerName ?? '')}
+                                    </span>
+                                    <span className="replay-trial-item-meta">
+                                        <span className="replay-trial-pips" aria-label={`${entry.roundsWon} of ${entry.roundCount} races won`}>
+                                            {Array.from({ length: entry.roundCount }, (_, i) => (
+                                                <i key={i} className={i < entry.roundsWon ? 'is-won' : undefined} />
+                                            ))}
+                                        </span>
+                                        <span className={`replay-trial-item-outcome ${won ? 'replay-trial-item-outcome--win' : 'replay-trial-item-outcome--loss'}`}>
+                                            {won ? 'W' : 'L'} {entry.roundsWon}/{entry.roundCount}
+                                        </span>
+                                        <span className="replay-trial-item-score">{formatScore(entry.totalTeamScore)}</span>
+                                    </span>
+                                </button>
+                            );
+                        })}
                     </div>
-                </Col>
-                <Col md={9}>
+                </aside>
+                <div className="replay-stage">
                     {!session && (
-                        <div className="replay-stage-card empty-state">Select a Trial to view its replay.</div>
+                        <div className="app-card replay-stage-card empty-state">Select a trial to view its replay.</div>
                     )}
-                    {session && round && (
-                        <div className="replay-stage-card p-3">
-                            <div className="replay-header-panel d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-                                <div>
-                                    <h5 className="mb-0">{session.fileName}</h5>
-                                    <div className="text-muted small">
-                                        {formatReplayRoundDescription(round)}
-                                    </div>
+                    {session && round && raceData && (
+                        <div className="app-card replay-stage-card">
+                            <div className="replay-header-panel">
+                                <div className="replay-header-text">
+                                    <h2 className="replay-header-title">{session.fileName}</h2>
+                                    <div className="replay-header-sub">{formatReplayRoundDescription(round)}</div>
                                 </div>
-                                <ButtonGroup>
+                                <ButtonGroup size="sm" className="replay-round-picker">
                                     {session.rounds.map((r, i) => (
                                         <Button
                                             key={r.round}
                                             variant={i === selectedRound ? 'primary' : 'outline-secondary'}
-                                            size="sm"
                                             onClick={() => setSelectedRound(i)}
+                                            className={r.playerWonRound ? 'is-won' : 'is-lost'}
                                         >
-                                            R{r.round}: {DISTANCE_LABELS[r.distanceType] ?? 'Unknown'}
+                                            <span className="replay-round-index">R{r.round}</span>
+                                            {DISTANCE_LABELS[r.distanceType] ?? 'Unknown'}
                                         </Button>
                                     ))}
                                 </ButtonGroup>
@@ -166,7 +176,7 @@ export default function ReplayPage() {
                             <RaceDataPresenter
                                 key={`${session.id}-${selectedRound}`}
                                 raceHorseInfo={round.parsedRace.raceHorseInfo}
-                                raceData={round.parsedRace.raceData}
+                                raceData={raceData}
                                 detectedCourseId={round.parsedRace.detectedCourseId}
                                 raceType={round.parsedRace.raceType}
                                 trackDetails={round.parsedRace.trackDetails}
@@ -174,8 +184,8 @@ export default function ReplayPage() {
                         </div>
                     )}
                     {session && !round && <Spinner animation="border" size="sm" />}
-                </Col>
-            </Row>
+                </div>
+            </div>
         </div>
     );
 }

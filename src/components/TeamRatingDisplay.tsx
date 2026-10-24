@@ -1,11 +1,6 @@
 import { formatScore } from '../utils/formatScore';
+import { AnimatedText } from './AnimatedNumber';
 import { getTeamRankIcon } from '../utils/teamRankUtils';
-
-export function formatTeamRatingHtml(teamRating: number, showLabel = true): string {
-    const { icon, name } = getTeamRankIcon(teamRating);
-    const label = showLabel ? 'Team Rating ' : '';
-    return `${label}<img src="${icon}" alt="${name}" class="rating-display-icon team-rating-display-icon" /> ${formatScore(teamRating)}`;
-}
 
 export default function TeamRatingDisplay({
     teamRating,
@@ -24,7 +19,7 @@ export default function TeamRatingDisplay({
         <span className={`rating-display team-rating-display${className ? ` ${className}` : ''}`}>
             {showLabel && <span className="rating-display-label">{label} </span>}
             <img src={icon} alt={name} className="rating-display-icon team-rating-display-icon" />
-            <span className="rating-display-score">{formatScore(teamRating)}</span>
+            <span className="rating-display-score"><AnimatedText text={formatScore(teamRating)} /></span>
         </span>
     );
 }

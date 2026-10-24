@@ -1,124 +1,162 @@
-import { useEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
+import { prefersReducedMotion, startTween } from './motion';
 
-const NUMBER_ANIMATION_MS = 420;
-const NUMBER_PATTERN = /-?\d[\d,]*(?:\.\d+)?/g;
+/* --- Numbers inside text ------------------------------------------------- */
+
+const NUMBER_PATTERN = /[+\-−±]?\d[\d,]*(?:\.\d+)?/g;
 
 type NumberToken = {
-    raw: string;
     value: number;
     start: number;
     end: number;
     decimals: number;
-    useGrouping: boolean;
+    grouped: boolean;
+    /** Explicitly signed ("+12", "−3", "±0"): intermediate values keep a sign. */
+    signed: boolean;
 };
 
 function parseTokens(text: string): NumberToken[] {
     return Array.from(text.matchAll(NUMBER_PATTERN)).map((match) => {
         const raw = match[0];
-        const decimalPart = raw.includes('.') ? raw.split('.')[1] : '';
+        const signChar = /^[+\-−±]/.test(raw) ? raw[0] : '';
+        const digits = signChar ? raw.slice(1) : raw;
+        const magnitude = Number(digits.replace(/,/g, ''));
+        const start = match.index ?? 0;
         return {
-            raw,
-            value: Number(raw.replace(/,/g, '')),
-            start: match.index ?? 0,
-            end: (match.index ?? 0) + raw.length,
-            decimals: decimalPart.length,
-            useGrouping: raw.includes(','),
+            value: signChar === '-' || signChar === '−' ? -magnitude : magnitude,
+            start,
+            end: start + raw.length,
+            decimals: digits.includes('.') ? digits.split('.')[1].length : 0,
+            grouped: digits.includes(','),
+            signed: signChar === '+' || signChar === '−' || signChar === '±',
         };
     }).filter((token) => Number.isFinite(token.value));
 }
 
-function formatToken(value: number, target: NumberToken): string {
-    if (target.useGrouping) {
-        return value.toLocaleString(undefined, {
+function formatToken(value: number, target: NumberToken, grouped: boolean): string {
+    const rounded = Number(value.toFixed(target.decimals));
+    const magnitude = Math.abs(rounded);
+    const digits = grouped
+        ? magnitude.toLocaleString(undefined, {
             minimumFractionDigits: target.decimals,
             maximumFractionDigits: target.decimals,
-        });
+        })
+        : magnitude.toFixed(target.decimals);
+    if (target.signed) {
+        if (rounded > 0) return `+${digits}`;
+        if (rounded < 0) return `−${digits}`;
+        return `±${digits}`;
     }
-    return value.toFixed(target.decimals);
+    return rounded < 0 ? `-${digits}` : digits;
 }
 
-function renderInterpolatedText(
-    targetText: string,
-    fromTokens: NumberToken[],
-    toTokens: NumberToken[],
-    progress: number,
-): string {
+function interpolateText(targetText: string, from: NumberToken[], to: NumberToken[], progress: number): string {
     let output = '';
     let cursor = 0;
-    toTokens.forEach((toToken, index) => {
-        const fromToken = fromTokens[index];
+    to.forEach((toToken, index) => {
+        const fromToken = from[index];
         const value = fromToken.value + (toToken.value - fromToken.value) * progress;
         output += targetText.slice(cursor, toToken.start);
-        output += formatToken(value, toToken);
+        output += formatToken(value, toToken, toToken.grouped || fromToken.grouped);
         cursor = toToken.end;
     });
     return output + targetText.slice(cursor);
 }
 
-function prefersReducedMotion(): boolean {
-    return typeof window !== 'undefined'
-        && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+/**
+ * Whether each animated element is in view (clipped scroll areas count as out
+ * of view). Off-screen numbers swap instantly, so a page with hundreds of table
+ * values only tweens the ones you can see.
+ */
+const onScreen = new WeakMap<Element, boolean>();
+let visibilityObserver: IntersectionObserver | null = null;
+
+function observeVisibility(element: Element): () => void {
+    if (typeof IntersectionObserver === 'undefined') return () => {};
+    visibilityObserver ??= new IntersectionObserver((entries) => {
+        entries.forEach((entry) => onScreen.set(entry.target, entry.isIntersecting));
+    });
+    visibilityObserver.observe(element);
+    return () => {
+        visibilityObserver?.unobserve(element);
+        onScreen.delete(element);
+    };
 }
 
+/**
+ * Tweens the numbers inside `text` when it changes, starting from whatever is
+ * on screen (so an interrupted tween continues rather than jumping). Text whose
+ * numbers don't line up (different count) swaps immediately.
+ *
+ * Frames write the text node directly instead of re-rendering, and React only
+ * ever renders the initial text, so it never overwrites a frame. `<data>` rather
+ * than `<span>` keeps the wrapper clear of `span` selectors in the surrounding markup.
+ */
 export function AnimatedText({ text }: { text: string }) {
-    const [displayText, setDisplayText] = useState(text);
-    const previousTextRef = useRef(text);
-    const frameRef = useRef<number | null>(null);
+    const elementRef = useRef<HTMLDataElement>(null);
+    const [initialText] = useState(text);
+    const shownRef = useRef(text);
 
-    useEffect(() => {
-        if (previousTextRef.current === text) return;
+    useLayoutEffect(() => {
+        const element = elementRef.current;
+        return element ? observeVisibility(element) : undefined;
+    }, []);
 
-        if (frameRef.current !== null) {
-            window.cancelAnimationFrame(frameRef.current);
-            frameRef.current = null;
-        }
-
-        const fromTokens = parseTokens(previousTextRef.current);
+    useLayoutEffect(() => {
+        const element = elementRef.current;
+        const fromText = shownRef.current;
+        if (!element || fromText === text) return undefined;
+        const show = (value: string) => {
+            shownRef.current = value;
+            const node = element.firstChild;
+            if (node && node.nodeType === Node.TEXT_NODE) node.nodeValue = value;
+            else element.textContent = value;
+        };
+        const fromTokens = parseTokens(fromText);
         const toTokens = parseTokens(text);
-        previousTextRef.current = text;
-
         if (
             prefersReducedMotion()
+            || onScreen.get(element) === false
             || fromTokens.length === 0
             || fromTokens.length !== toTokens.length
         ) {
-            setDisplayText(text);
-            return;
+            show(text);
+            return undefined;
         }
-
-        const startedAt = performance.now();
-        const tick = (now: number) => {
-            const progress = Math.min(1, (now - startedAt) / NUMBER_ANIMATION_MS);
-            const eased = 1 - ((1 - progress) ** 3);
-            setDisplayText(renderInterpolatedText(text, fromTokens, toTokens, eased));
-
-            if (progress < 1) {
-                frameRef.current = window.requestAnimationFrame(tick);
-            } else {
-                frameRef.current = null;
-                setDisplayText(text);
-            }
-        };
-
-        frameRef.current = window.requestAnimationFrame(tick);
-
-        return () => {
-            if (frameRef.current !== null) {
-                window.cancelAnimationFrame(frameRef.current);
-                frameRef.current = null;
-            }
-        };
+        return startTween(
+            (progress) => show(interpolateText(text, fromTokens, toTokens, progress)),
+            () => show(text),
+        );
     }, [text]);
 
-    return <>{displayText}</>;
+    return <data ref={elementRef} className="tween-text">{initialText}</data>;
 }
 
-export function AnimatedNumber({
-    value,
-    format = (nextValue) => String(nextValue),
-}: {
-    value: number;
-    format?: (value: number) => string;
-}) {
-    return <AnimatedText text={format(value)} />;
+/* --- Numeric arrays (SVG geometry) ---------------------------------------- */
+
+/** Tweens each value toward `target`; arrays of a different length swap immediately. */
+export function useTweenedValues(target: readonly number[]): number[] {
+    const [shown, setShown] = useState<number[]>(() => [...target]);
+    const shownRef = useRef(shown);
+    const targetKey = target.join('|');
+
+    useLayoutEffect(() => {
+        const from = shownRef.current;
+        const to = targetKey === '' ? [] : targetKey.split('|').map(Number);
+        if (from.length === to.length && from.every((value, index) => value === to[index])) return undefined;
+        const show = (values: number[]) => {
+            shownRef.current = values;
+            setShown(values);
+        };
+        if (prefersReducedMotion() || from.length !== to.length) {
+            show(to);
+            return undefined;
+        }
+        return startTween(
+            (progress) => show(to.map((value, index) => from[index] + (value - from[index]) * progress)),
+            () => show(to),
+        );
+    }, [targetKey]);
+
+    return shown;
 }

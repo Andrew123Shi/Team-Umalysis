@@ -1,6 +1,5 @@
 import GameDataLoader from '../data/GameDataLoader';
-import { deserializeFromBase64 } from '../data/RaceDataParser';
-import { filterCharaSkills } from '../data/RaceDataUtils';
+import { summarizeFromBase64, type RaceScenarioSummary } from '../data/RaceDataParser';
 import { fromRaceHorseData, hydrateCompactRaceHorseData } from '../data/TrainedCharaData';
 import UMDatabaseWrapper from '../data/UMDatabaseWrapper';
 import { formatScore } from '../utils/formatScore';
@@ -156,17 +155,17 @@ function isSameRaceHorse(startHorse: any, raceHorse: any): boolean {
         && frameOrder === Number(raceHorse?.frame_order);
 }
 
-function bisectFrameIndex(frames: ParsedRaceView['raceData']['frame'], time: number): number {
-    if (frames.length === 0) return 0;
-    const last = frames.length - 1;
-    if (time <= (frames[0].time ?? 0)) return 0;
-    if (time >= (frames[last].time ?? 0)) return last;
+function bisectFrameIndex(frameTimes: number[], time: number): number {
+    if (frameTimes.length === 0) return 0;
+    const last = frameTimes.length - 1;
+    if (time <= frameTimes[0]) return 0;
+    if (time >= frameTimes[last]) return last;
 
     let left = 0;
     let right = last;
     while (left <= right) {
         const mid = Math.floor((left + right) / 2);
-        if ((frames[mid].time ?? 0) < time) {
+        if (frameTimes[mid] < time) {
             left = mid + 1;
         } else {
             right = mid - 1;
@@ -175,60 +174,57 @@ function bisectFrameIndex(frames: ParsedRaceView['raceData']['frame'], time: num
     return left;
 }
 
-function interpolateDistance(
-    frames: ParsedRaceView['raceData']['frame'],
-    frameOrder: number,
-    time: number,
-): number {
-    if (frames.length === 0) return 0;
-    const right = bisectFrameIndex(frames, time);
-    const left = Math.max(0, right - 1);
-    const f1 = frames[left];
-    const f2 = frames[right];
-    if (!f1 || !f2) return 0;
+function frameDistance(scenario: RaceScenarioSummary, frameIndex: number, horseIndex: number): number {
+    if (!Number.isInteger(horseIndex) || horseIndex < 0 || horseIndex >= scenario.horseNum) return 0;
+    return scenario.frameDistances[frameIndex * scenario.horseNum + horseIndex] ?? 0;
+}
 
-    const t1 = f1.time ?? 0;
-    const t2 = f2.time ?? 0;
-    const d1 = f1.horseFrame?.[frameOrder]?.distance ?? 0;
-    const d2 = f2.horseFrame?.[frameOrder]?.distance ?? 0;
+function interpolateDistance(scenario: RaceScenarioSummary, frameOrder: number, time: number): number {
+    const { frameTimes } = scenario;
+    if (frameTimes.length === 0) return 0;
+    const right = bisectFrameIndex(frameTimes, time);
+    const left = Math.max(0, right - 1);
+
+    const t1 = frameTimes[left];
+    const t2 = frameTimes[right];
+    const d1 = frameDistance(scenario, left, frameOrder);
+    const d2 = frameDistance(scenario, right, frameOrder);
     if (t2 === t1) return d1;
     return d1 + (d2 - d1) * ((time - t1) / (t2 - t1));
 }
 
-function calculateRaceDistance(raceData: ParsedRaceView['raceData']): number {
-    const frames = raceData.frame ?? [];
+function calculateRaceDistance(scenario: RaceScenarioSummary): number {
     let winnerIndex = -1;
     let winnerFinish = Number.POSITIVE_INFINITY;
-    (raceData.horseResult ?? []).forEach((horseResult, index) => {
-        const finish = horseResult?.finishTimeRaw;
-        if (typeof finish === 'number' && finish > 0 && finish < winnerFinish) {
+    scenario.finishTimeRaw.forEach((finish, index) => {
+        if (finish > 0 && finish < winnerFinish) {
             winnerFinish = finish;
             winnerIndex = index;
         }
     });
 
-    if (winnerIndex >= 0 && frames.length > 0 && Number.isFinite(winnerFinish)) {
-        const frameIndex = bisectFrameIndex(frames, winnerFinish);
-        const distance = frames[frameIndex]?.horseFrame?.[winnerIndex]?.distance ?? 0;
+    if (winnerIndex >= 0 && scenario.frameTimes.length > 0 && Number.isFinite(winnerFinish)) {
+        const frameIndex = bisectFrameIndex(scenario.frameTimes, winnerFinish);
+        const distance = frameDistance(scenario, frameIndex, winnerIndex);
         return Math.round(distance / 100) * 100;
     }
 
-    return raceData.header?.maxLength ?? 0;
+    return scenario.maxLength;
 }
 
 function computeWinnerMarginLengths(
-    raceData: ParsedRaceView['raceData'],
+    scenario: RaceScenarioSummary,
     raceHorseInfo: any[],
 ): Map<number, number> {
     const ordered = raceHorseInfo
         .map((horse) => {
             const frameOrder = Number(horse.frame_order) - 1;
-            const result = Number.isFinite(frameOrder) ? raceData.horseResult?.[frameOrder] : undefined;
+            const finishTimeRaw = Number.isFinite(frameOrder) ? scenario.finishTimeRaw[frameOrder] : undefined;
             return {
                 trainedCharaId: Number(horse.trained_chara_id),
                 frameOrder,
                 finishOrder: Number(horse.finish_order),
-                finishTimeRaw: result?.finishTimeRaw ?? Number(horse.finish_time ?? 0),
+                finishTimeRaw: finishTimeRaw ?? Number(horse.finish_time ?? 0),
             };
         })
         .filter((entry) => (
@@ -245,10 +241,10 @@ function computeWinnerMarginLengths(
         return new Map();
     }
 
-    const raceDistance = calculateRaceDistance(raceData);
+    const raceDistance = calculateRaceDistance(scenario);
     if (raceDistance <= 0) return new Map();
 
-    const secondDistanceAtWinnerFinish = interpolateDistance(raceData.frame ?? [], second.frameOrder, winner.finishTimeRaw);
+    const secondDistanceAtWinnerFinish = interpolateDistance(scenario, second.frameOrder, winner.finishTimeRaw);
     const marginMeters = Math.max(0, raceDistance - secondDistanceAtWinnerFinish);
     return new Map([[winner.trainedCharaId, marginMeters / METERS_PER_LENGTH]]);
 }
@@ -291,16 +287,16 @@ function buildAptitudes(horse: any): AptitudeSet {
     };
 }
 
-function extractActivatedSkills(raceData: ParsedRaceView['raceData'], frameOrder: number): number[] {
+function extractActivatedSkills(scenario: RaceScenarioSummary, frameOrder: number): number[] {
     const frameIdx = frameOrder - 1;
     if (!Number.isFinite(frameIdx) || frameIdx < 0) return [];
-    return filterCharaSkills(raceData, frameIdx).map((event) => event.param[1]);
+    return scenario.skillIdsByHorse.get(frameIdx)?.slice() ?? [];
 }
 
 function buildUmaEntry(
     horse: any,
     charaResult: any,
-    raceData: ParsedRaceView['raceData'],
+    scenario: RaceScenarioSummary,
     supportCardBonus: number,
     winMarginLengths?: number,
 ): UmaEntry {
@@ -343,13 +339,15 @@ function buildUmaEntry(
         totalScore: scoreEvents.reduce((sum, e) => sum + e.score, 0),
         totalBaseScore: scoreEvents.reduce((sum, e) => sum + e.baseScore, 0),
         scoreEvents,
-        activatedSkillIds: extractActivatedSkills(raceData, frameOrder),
+        activatedSkillIds: extractActivatedSkills(scenario, frameOrder),
         motivation: Number(horse.motivation ?? 3),
         starCount: Math.min(5, Math.max(0, Number(horse.rarity ?? horse.talent_level ?? 0))),
     };
 }
 
-export function parseTeamTrialRace(json: any, index: number): ParsedRaceView | { error: string } {
+type ParsedTeamTrialRace = { view: ParsedRaceView; scenario: RaceScenarioSummary };
+
+function parseTeamTrialRace(json: any, index: number): ParsedTeamTrialRace | { error: string } {
     const start = json.race_start_params_array?.[index];
     const result = json.race_result_array?.[index];
     if (!start || !result) return { error: `Team Trial race ${index + 1} is missing start or result data` };
@@ -358,8 +356,7 @@ export function parseTeamTrialRace(json: any, index: number): ParsedRaceView | {
         return { error: `Team Trial race ${index + 1} has no race_scenario` };
     }
 
-    const raceData = deserializeFromBase64(result.race_scenario);
-    if (!raceData) return { error: `Failed to parse Team Trial race ${index + 1} scenario data` };
+    const scenario = summarizeFromBase64(result.race_scenario);
 
     const raceInstanceId = Number(start.race_instance_id);
     const courseId = Number.isFinite(raceInstanceId)
@@ -391,7 +388,7 @@ export function parseTeamTrialRace(json: any, index: number): ParsedRaceView | {
         })
         .filter((horse: any) => {
             const frameOrder = Number(horse?.frame_order);
-            return Number.isFinite(frameOrder) && frameOrder >= 1 && frameOrder <= raceData.horseResult.length;
+            return Number.isFinite(frameOrder) && frameOrder >= 1 && frameOrder <= scenario.finishTimeRaw.length;
         })
         .sort((a: any, b: any) => Number(a.frame_order) - Number(b.frame_order));
 
@@ -405,21 +402,23 @@ export function parseTeamTrialRace(json: any, index: number): ParsedRaceView | {
     const label = `Race ${Number.isFinite(round) ? round : index + 1}${scoreLabel}`;
 
     return {
-        label,
-        raceHorseInfo,
-        raceData,
-        raceScenario: result.race_scenario,
-        detectedCourseId: courseId,
-        horseActVersion: json.horseACT_version,
-        raceType: 'Team Trials',
-        trackDetails: {
-            condition: start.ground_condition?.toString(),
-            weather: start.weather?.toString(),
-            season: normalizeSeasonValue(start.season)?.toString(),
+        scenario,
+        view: {
+            label,
+            raceHorseInfo,
+            raceScenario: result.race_scenario,
+            detectedCourseId: courseId,
+            horseActVersion: json.horseACT_version,
+            raceType: 'Team Trials',
+            trackDetails: {
+                condition: start.ground_condition?.toString(),
+                weather: start.weather?.toString(),
+                season: normalizeSeasonValue(start.season)?.toString(),
+            },
+            round: Number.isFinite(round) ? round : index + 1,
+            teamTotalScore: Number.isFinite(teamTotalScore) ? teamTotalScore : undefined,
+            winType: typeof result.win_type === 'number' ? result.win_type : undefined,
         },
-        round: Number.isFinite(round) ? round : index + 1,
-        teamTotalScore: Number.isFinite(teamTotalScore) ? teamTotalScore : undefined,
-        winType: typeof result.win_type === 'number' ? result.win_type : undefined,
     };
 }
 
@@ -437,15 +436,16 @@ export function parseTeamTrialSession(json: any, fileName: string): TTSession | 
     const opponentTeamId = playerIdentity.teamId === 1 ? 2 : 1;
 
     for (let index = 0; index < count; index++) {
-        const parsed = parseTeamTrialRace(json, index);
-        if ('error' in parsed) return parsed;
+        const parsedRace = parseTeamTrialRace(json, index);
+        if ('error' in parsedRace) return parsedRace;
+        const { view: parsed, scenario } = parsedRace;
 
         const start = starts[index];
         const result = results[index];
         const horses = start.race_horse_data_array ?? [];
         const charaResults = result.chara_result_array ?? [];
         const charaResultMaps = buildCharaResultMaps(charaResults);
-        const winMarginsByTrainedCharaId = computeWinnerMarginLengths(parsed.raceData, parsed.raceHorseInfo);
+        const winMarginsByTrainedCharaId = computeWinnerMarginLengths(scenario, parsed.raceHorseInfo);
 
         const playerUmas: UmaEntry[] = [];
         const opponentUmas: UmaEntry[] = [];
@@ -457,7 +457,7 @@ export function parseTeamTrialSession(json: any, fileName: string): TTSession | 
             const entry = buildUmaEntry(
                 hydrated,
                 charaResult,
-                parsed.raceData,
+                scenario,
                 Number(json.support_card_bonus ?? 0),
                 winMarginsByTrainedCharaId.get(Number(horse.trained_chara_id)),
             );

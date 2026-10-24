@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Nav } from 'react-bootstrap';
 import { DISTANCE_LABELS, DISTANCE_ORDER } from '../analytics/types';
 
 export default function DistanceJumpNav({
@@ -46,17 +45,18 @@ export default function DistanceJumpNav({
     };
 
     return (
-        <Nav className="flex-column distance-jump-nav">
+        <nav className="distance-jump-nav" aria-label="Jump to distance">
             {DISTANCE_ORDER.map((distanceType) => (
-                <Nav.Link
+                <button
                     key={distanceType}
-                    active={activeDistance === distanceType}
+                    type="button"
+                    className={`distance-jump-link${activeDistance === distanceType ? ' is-active' : ''}`}
+                    aria-current={activeDistance === distanceType ? 'true' : undefined}
                     onClick={() => scrollTo(distanceType)}
-                    className="mb-1 px-2 py-1"
                 >
                     {DISTANCE_LABELS[distanceType]}
-                </Nav.Link>
+                </button>
             ))}
-        </Nav>
+        </nav>
     );
 }

@@ -1,16 +1,34 @@
-import { useEffect, useMemo, useState } from 'react';
-import ReactECharts from 'echarts-for-react';
-import { Form } from 'react-bootstrap';
-import type { AggregatedStats, RosterChangeUma, RosterUpdate } from '../../analytics/types';
+import { memo, useEffect, useMemo, useState } from 'react';
+import EChart from './EChart';
+import type { AggregatedStats } from '../../analytics/types';
 import type { StatCardViewMode } from './StatCards';
 import { type LegendSelectChangedEvent } from './chartLegendScale';
 import { formatScore } from '../../utils/formatScore';
 import { ema, emaForVisibleWindow, emaLineFadeColor } from '../../utils/ema';
-import { segmentAverage } from '../../utils/segmentAverage';
-import { formatUmaDisplayName } from '../../utils/umaDisplayName';
-import { formatRatingHtml } from '../RatingDisplay';
 import { chartTooltipStyle } from './chartTooltip';
 import { CHART_UPDATE_ANIMATION } from './chartLayout';
+import {
+    CHART_COLORS,
+    CHART_SPLIT_LINE,
+    CHART_TEXT_STYLE,
+    chartLegend,
+    evenAxisInterval,
+    useChartScale,
+} from './chartTheme';
+import {
+    buildRosterMarkerSeries,
+    buildTrendTooltipFormatter,
+    compactAxisNumber,
+    formatChartDate,
+    indexedPoints,
+    sliceTrendWindow,
+    trendGridInsets,
+    trendIndexAxis,
+    trendValueAxis,
+    TrendNumberInput,
+    useTrendWindow,
+    windowedSegmentAverage,
+} from './trendChartShared';
 import SectionHeading from '../SectionHeading';
 import { useLoadingRemainingFiles } from '../RemainingFilesLoadingAlert';
 import { useRaceStore } from '../../store/RaceStore';
@@ -23,6 +41,7 @@ function isScoreLegendVisible(selected: ScoreLegendSelection, key: ScoreLegendKe
 }
 
 const SEGMENT_AVG_LABEL = 'Roster Average';
+const BONUS_LABEL = 'Support Bonus';
 
 function toEchartsLegendSelected(
     selected: ScoreLegendSelection,
@@ -34,7 +53,7 @@ function toEchartsLegendSelected(
         [scoreName]: isScoreLegendVisible(selected, 'score'),
         [emaLabel]: isScoreLegendVisible(selected, 'ema'),
         [SEGMENT_AVG_LABEL]: isScoreLegendVisible(selected, 'segmentAvg'),
-        ...(showBonusChart ? { 'Support Bonus': isScoreLegendVisible(selected, 'bonus') } : {}),
+        ...(showBonusChart ? { [BONUS_LABEL]: isScoreLegendVisible(selected, 'bonus') } : {}),
     };
 }
 
@@ -48,7 +67,7 @@ function fromEchartsLegendSelected(
         score: selected[scoreName],
         ema: selected[emaLabel],
         segmentAvg: selected[SEGMENT_AVG_LABEL],
-        ...(showBonusChart ? { bonus: selected['Support Bonus'] } : {}),
+        ...(showBonusChart ? { bonus: selected[BONUS_LABEL] } : {}),
     };
 }
 
@@ -69,6 +88,10 @@ function snapScoreYRange(...series: number[][]): { min: number; max: number } {
         snappedMin -= SCORE_Y_STEP;
         snappedMax += SCORE_Y_STEP;
     }
+    // A range no step divides evenly leaves a crowded label at the top.
+    for (let i = 0; i < 4 && evenAxisInterval(snappedMin, snappedMax, SCORE_Y_STEP) === undefined; i += 1) {
+        snappedMax += SCORE_Y_STEP;
+    }
     return { min: snappedMin, max: snappedMax };
 }
 
@@ -86,112 +109,7 @@ function snapBonusPercentYRange(values: number[]): { min: number; max: number } 
     return { min: snappedMin, max: snappedMax };
 }
 
-function formatChartDate(isoDate: string): string {
-    const [year, month, day] = isoDate.split('-');
-    if (!year || !month || !day) return isoDate;
-    return `${month}/${day}/${year}`;
-}
-
-function formatRosterUmaLine(uma: RosterChangeUma, sign: '-' | '+'): string {
-    const name = formatUmaDisplayName(uma.charaName, uma.cardId);
-    const text = `${sign} ${name} · ${formatRatingHtml(uma.rankScore)}`;
-    const color = sign === '-' ? '#ea868f' : '#75b798';
-    return `<span style="color:${color}">${text}</span>`;
-}
-
-function formatRosterUpdateHtml(update: RosterUpdate): string {
-    const lines = ['<b>Roster Updated:</b>'];
-    update.removed.forEach((uma) => lines.push(formatRosterUmaLine(uma, '-')));
-    update.added.forEach((uma) => lines.push(formatRosterUmaLine(uma, '+')));
-    return lines.join('<br/>');
-}
-
-function buildTooltipFormatter(
-    scoreTrend: AggregatedStats['scoreTrend'],
-    formatValue: (seriesName: string | undefined, value: number) => string,
-    showFileName = false,
-) {
-    return (params: unknown) => {
-        const items = (Array.isArray(params) ? params : [params]) as {
-            axisValue?: string;
-            seriesName?: string;
-            marker?: string;
-            value?: number | null;
-            dataIndex?: number;
-        }[];
-        if (items.length === 0) return '';
-        const header = items[0].axisValue ?? '';
-        const dataIndex = items[0].dataIndex;
-        const lines = items.map((item) => {
-            const val = item.value;
-            if (val == null || !Number.isFinite(val)) return '';
-            return `${item.marker ?? ''}${item.seriesName ?? ''}: ${formatValue(item.seriesName, val)}`;
-        }).filter(Boolean);
-        const trendPoint = dataIndex != null ? scoreTrend[dataIndex] : undefined;
-        const rosterUpdate = trendPoint?.rosterUpdate;
-        const parts = [`<b>${header}</b>`, ...lines.map((line) => `<b>${line}</b>`)];
-        if (showFileName && trendPoint?.fileName) {
-            parts.push('');
-            parts.push(`<span style="color:#adb5bd;font-size:11px">${trendPoint.fileName}</span>`);
-        }
-        if (rosterUpdate) {
-            parts.push('');
-            parts.push(formatRosterUpdateHtml(rosterUpdate));
-        }
-        return parts.join('<br/>');
-    };
-}
-
-function buildRosterMarkerSeries(
-    rosterMarkLine: ReturnType<typeof buildRosterMarkLine>,
-    pointCount: number,
-    xAxisIndex = 0,
-    yAxisIndex = 0,
-) {
-    if (!rosterMarkLine) return null;
-    return {
-        name: '__roster_updates__',
-        type: 'line' as const,
-        xAxisIndex,
-        yAxisIndex,
-        data: Array.from({ length: pointCount }, () => null),
-        showSymbol: false,
-        lineStyle: { opacity: 0, width: 0 },
-        itemStyle: { opacity: 0 },
-        silent: false,
-        tooltip: { show: false },
-        emphasis: { disabled: true },
-        markLine: rosterMarkLine,
-        z: 10,
-    };
-}
-
-function buildRosterMarkLine(
-    markLines: { xAxis: number }[],
-    scoreTrend: AggregatedStats['scoreTrend'],
-) {
-    if (markLines.length === 0) return undefined;
-    return {
-        symbol: 'none',
-        silent: false,
-        label: { show: false },
-        lineStyle: { color: 'rgba(234, 134, 143, 0.45)', width: 1, type: 'dashed' as const },
-        emphasis: { lineStyle: { width: 1.5, color: 'rgba(234, 134, 143, 0.7)' } },
-        tooltip: {
-            ...chartTooltipStyle,
-            show: true,
-            formatter: (params: { data?: { xAxis?: number } }) => {
-                const dataIndex = params.data?.xAxis;
-                const update = dataIndex != null ? scoreTrend[dataIndex]?.rosterUpdate : undefined;
-                if (!update) return '';
-                return formatRosterUpdateHtml(update);
-            },
-        },
-        data: markLines,
-    };
-}
-
-export default function ScoreTrendChart({
+function ScoreTrendChart({
     stats,
     emaSourceTrend,
     viewMode = 'team',
@@ -203,42 +121,25 @@ export default function ScoreTrendChart({
 }) {
     const { debugMode } = useRaceStore();
     const loadingRemaining = useLoadingRemainingFiles();
+    const scale = useChartScale();
     const [emaPeriod, setEmaPeriod] = useState(50);
     const [legendSelected, setLegendSelected] = useState<ScoreLegendSelection>({});
 
-    const dates = stats.scoreTrend.map((d) => d.date);
-    const formattedDates = useMemo(() => dates.map(formatChartDate), [dates]);
-    const trendKeys = useMemo(() => stats.scoreTrend.map((d) => d.fileName), [stats.scoreTrend]);
-    const rawScores = stats.scoreTrend.map((d) => d.teamScore);
-    const bonusValues = stats.scoreTrend.map((d) => bonusPercent(d.supportCardBonus));
-
-    const sourceKeys = useMemo(
-        () => (loadingRemaining ? undefined : emaSourceTrend?.map((d) => d.fileName)),
-        [emaSourceTrend, loadingRemaining],
-    );
-    const sourceRawScores = useMemo(
-        () => (loadingRemaining ? undefined : emaSourceTrend?.map((d) => d.teamScore)),
-        [emaSourceTrend, loadingRemaining],
-    );
+    const source = loadingRemaining ? undefined : emaSourceTrend;
+    const view = useTrendWindow(stats.scoreTrend, source);
+    const trend = view.trend;
+    const formattedDates = useMemo(() => trend.map((d) => formatChartDate(d.date)), [trend]);
+    const rawScores = useMemo(() => trend.map((d) => d.teamScore), [trend]);
+    const bonusValues = useMemo(() => trend.map((d) => bonusPercent(d.supportCardBonus)), [trend]);
 
     const isDistanceView = viewMode === 'distance';
     const isUmaView = viewMode === 'uma';
     const isScopedScoreView = isUmaView || isDistanceView;
-    const rosterUpdateMarkLines = useMemo(
-        () => stats.scoreTrend
-            .map((point, index) => (point.rosterUpdate ? { xAxis: index } : null))
-            .filter((line): line is { xAxis: number } => line !== null),
-        [stats.scoreTrend],
-    );
-    const rosterBoundaryIndices = useMemo(
-        () => rosterUpdateMarkLines.map((line) => line.xAxis),
-        [rosterUpdateMarkLines],
-    );
 
     const activeScores = rawScores;
     const activeSegmentAvg = useMemo(
-        () => segmentAverage(activeScores, rosterBoundaryIndices),
-        [activeScores, rosterBoundaryIndices],
+        () => windowedSegmentAverage(activeScores, view),
+        [activeScores, view],
     );
     const rosterAverageSeed = useMemo(() => {
         if (!loadingRemaining) return undefined;
@@ -246,22 +147,27 @@ export default function ScoreTrendChart({
         return seed != null && Number.isFinite(seed) ? seed : undefined;
     }, [activeSegmentAvg, loadingRemaining]);
 
-    const rawEma = useMemo(
-        () => (loadingRemaining
-            ? ema(rawScores, emaPeriod, rosterAverageSeed)
-            : emaForVisibleWindow(rawScores, trendKeys, sourceRawScores, sourceKeys, emaPeriod)),
-        [loadingRemaining, rawScores, trendKeys, sourceRawScores, sourceKeys, emaPeriod, rosterAverageSeed],
-    );
-    const activeEma = rawEma;
+    const activeEma = useMemo(() => {
+        if (loadingRemaining) return ema(rawScores, emaPeriod, rosterAverageSeed);
+        if (view.windowed || !source) return ema(rawScores, emaPeriod);
+        return emaForVisibleWindow(
+            rawScores,
+            trend.map((d) => d.fileName),
+            source.map((d) => d.teamScore),
+            source.map((d) => d.fileName),
+            emaPeriod,
+        );
+    }, [loadingRemaining, rawScores, emaPeriod, rosterAverageSeed, view, source, trend]);
 
-    const dateInterval = dates.length > 12 ? Math.ceil(dates.length / 8) - 1 : 0;
+    const scorePoints = useMemo(() => indexedPoints(activeScores), [activeScores]);
+    const emaPoints = useMemo(() => indexedPoints(activeEma), [activeEma]);
+    const segmentPoints = useMemo(() => indexedPoints(activeSegmentAvg), [activeSegmentAvg]);
+    const bonusPoints = useMemo(() => indexedPoints(bonusValues), [bonusValues]);
     const emaLabel = `EMA ${Math.max(1, Math.floor(emaPeriod))}`;
     const scoreName = isScopedScoreView
         ? (isDistanceView ? 'Race Score' : 'Score')
-        : (isDistanceView ? 'Race Score' : 'Total Score');
+        : 'Total Score';
     const showBonusChart = !isScopedScoreView;
-    const gridLeft = 82;
-    const gridRight = 72;
 
     const echartsLegendSelected = useMemo(
         () => toEchartsLegendSelected(legendSelected, scoreName, emaLabel, showBonusChart),
@@ -273,38 +179,32 @@ export default function ScoreTrendChart({
     }, [showBonusChart]);
 
     const scoreYRange = useMemo(() => {
-        const scoreLineVisible = isScoreLegendVisible(legendSelected, 'score');
-        const emaLineVisible = isScoreLegendVisible(legendSelected, 'ema');
-        const segmentAvgVisible = isScoreLegendVisible(legendSelected, 'segmentAvg');
         const values: number[] = [];
-
         const pushFinite = (series: Array<number | null>) => {
             series.forEach((v) => { if (v != null && Number.isFinite(v)) values.push(v); });
         };
 
-        if (scoreLineVisible) pushFinite(activeScores);
-        if (emaLineVisible) pushFinite(activeEma);
-        if (segmentAvgVisible) pushFinite(activeSegmentAvg);
+        const scores = sliceTrendWindow(activeScores, view);
+        const emaValues = sliceTrendWindow(activeEma, view);
+        const segmentValues = sliceTrendWindow(activeSegmentAvg, view);
+        if (isScoreLegendVisible(legendSelected, 'score')) pushFinite(scores);
+        if (isScoreLegendVisible(legendSelected, 'ema')) pushFinite(emaValues);
+        if (isScoreLegendVisible(legendSelected, 'segmentAvg')) pushFinite(segmentValues);
 
         if (values.length === 0) {
-            pushFinite(activeScores);
-            pushFinite(activeEma);
-            pushFinite(activeSegmentAvg);
+            pushFinite(scores);
+            pushFinite(emaValues);
+            pushFinite(segmentValues);
         }
         return snapScoreYRange(values);
-    }, [
-        legendSelected,
-        activeScores,
-        activeEma,
-        activeSegmentAvg,
-    ]);
+    }, [legendSelected, activeScores, activeEma, activeSegmentAvg, view]);
 
     const bonusYRange = useMemo(() => {
         if (!isScoreLegendVisible(legendSelected, 'bonus')) {
             return snapBonusPercentYRange([]);
         }
-        return snapBonusPercentYRange(bonusValues);
-    }, [legendSelected, bonusValues]);
+        return snapBonusPercentYRange(sliceTrendWindow(bonusValues, view));
+    }, [legendSelected, bonusValues, view]);
 
     const onEvents = useMemo(() => ({
         legendselectchanged: (params: LegendSelectChangedEvent) => {
@@ -317,22 +217,28 @@ export default function ScoreTrendChart({
         },
     }), [scoreName, emaLabel, showBonusChart]);
 
+    const chartHeight = scale.px(isUmaView ? 300 : 400);
+
     const option = useMemo(() => {
+        const insets = trendGridInsets(scale);
         const legendData = showBonusChart
-            ? [scoreName, emaLabel, SEGMENT_AVG_LABEL, 'Support Bonus']
+            ? [scoreName, emaLabel, SEGMENT_AVG_LABEL, BONUS_LABEL]
             : [scoreName, emaLabel, SEGMENT_AVG_LABEL];
         const axisPointerLink = showBonusChart ? [{ xAxisIndex: [0, 1] }] : [{ xAxisIndex: [0] }];
 
-        const rosterMarkLine = buildRosterMarkLine(rosterUpdateMarkLines, stats.scoreTrend);
-        const rosterMarkerSeries = buildRosterMarkerSeries(
-            rosterMarkLine,
-            formattedDates.length,
-            0,
-            0,
-        );
+        const rosterMarkerSeries = buildRosterMarkerSeries(trend, 0, 0);
         const emaStroke = loadingRemaining
-            ? emaLineFadeColor('#ffc107', activeEma.length)
-            : '#ffc107';
+            ? emaLineFadeColor(CHART_COLORS.ema, activeEma.length)
+            : CHART_COLORS.ema;
+
+        const scoreYAxis = {
+            ...trendValueAxis(scale, 'Score', compactAxisNumber, 'left', scoreYRange),
+            min: scoreYRange.min,
+            max: scoreYRange.max,
+            interval: evenAxisInterval(scoreYRange.min, scoreYRange.max, SCORE_Y_STEP),
+            splitLine: CHART_SPLIT_LINE,
+            gridIndex: 0,
+        };
 
         const scoreSeries = [
             {
@@ -340,11 +246,20 @@ export default function ScoreTrendChart({
                 type: 'line' as const,
                 xAxisIndex: 0,
                 yAxisIndex: 0,
-                data: activeScores,
+                data: scorePoints,
                 smooth: true,
                 showSymbol: false,
-                itemStyle: { color: '#6ea8fe' },
-                lineStyle: { width: 2 },
+                itemStyle: { color: CHART_COLORS.primary },
+                lineStyle: { width: 1.6 },
+                areaStyle: {
+                    color: {
+                        type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+                        colorStops: [
+                            { offset: 0, color: 'rgba(77, 159, 255, 0.16)' },
+                            { offset: 1, color: 'rgba(77, 159, 255, 0)' },
+                        ],
+                    },
+                },
                 z: 3,
             },
             {
@@ -352,10 +267,10 @@ export default function ScoreTrendChart({
                 type: 'line' as const,
                 xAxisIndex: 0,
                 yAxisIndex: 0,
-                data: activeEma,
+                data: emaPoints,
                 smooth: true,
                 showSymbol: false,
-                itemStyle: { color: '#ffc107' },
+                itemStyle: { color: CHART_COLORS.ema },
                 lineStyle: { width: 2, type: 'dashed' as const, color: emaStroke },
                 z: 4,
             },
@@ -364,102 +279,16 @@ export default function ScoreTrendChart({
                 type: 'line' as const,
                 xAxisIndex: 0,
                 yAxisIndex: 0,
-                data: activeSegmentAvg,
+                data: segmentPoints,
                 step: 'end' as const,
                 showSymbol: false,
-                itemStyle: { color: '#ffffff' },
-                lineStyle: { width: 2, type: 'dashed' as const },
+                itemStyle: { color: CHART_COLORS.average },
+                lineStyle: { width: 1.5, type: [4, 4], opacity: 0.85 },
                 z: 5,
             },
         ];
 
-        if (!showBonusChart) {
-            return {
-                backgroundColor: 'transparent',
-                ...CHART_UPDATE_ANIMATION,
-                axisPointer: {
-                    link: axisPointerLink,
-                    animation: false,
-                    lineStyle: { color: '#6c757d', type: 'dashed' },
-                },
-                tooltip: {
-                    ...chartTooltipStyle,
-                    trigger: 'axis',
-                    axisPointer: {
-                        type: 'line',
-                        link: axisPointerLink,
-                        animation: false,
-                        snap: true,
-                        lineStyle: { color: '#adb5bd', type: 'dashed' },
-                    },
-                    formatter: buildTooltipFormatter(
-                        stats.scoreTrend,
-                        (_seriesName, value) => formatScore(value),
-                        debugMode,
-                    ),
-                },
-                legend: {
-                    data: legendData,
-                    selected: echartsLegendSelected,
-                    textStyle: { color: '#ced4da' },
-                    bottom: 0,
-                    itemWidth: 24,
-                    itemHeight: 2,
-                    icon: 'rect',
-                },
-                grid: [{ left: gridLeft, right: gridRight, top: 16, bottom: 48, containLabel: false }],
-                xAxis: [{
-                    type: 'category',
-                    data: formattedDates,
-                    boundaryGap: false,
-                    axisLabel: {
-                        color: '#ced4da',
-                        interval: dateInterval,
-                        showMinLabel: true,
-                        showMaxLabel: true,
-                        alignMinLabel: 'left',
-                        alignMaxLabel: 'right',
-                    },
-                    axisTick: { alignWithLabel: true },
-                    axisPointer: { show: true },
-                    gridIndex: 0,
-                }],
-                yAxis: [{
-                    type: 'value',
-                    name: 'Score',
-                    nameLocation: 'middle',
-                    nameRotate: 90,
-                    nameGap: 50,
-                    min: scoreYRange.min,
-                    max: scoreYRange.max,
-                    axisLabel: {
-                        color: '#ced4da',
-                        fontSize: 11,
-                        width: 72,
-                        align: 'right',
-                        margin: 4,
-                        formatter: (value: number) => formatScore(value),
-                    },
-                    splitLine: { lineStyle: { color: '#343a40' } },
-                    axisLine: { show: true, lineStyle: { color: '#6c757d' } },
-                    gridIndex: 0,
-                }],
-                series: [
-                    ...scoreSeries,
-                    ...(rosterMarkerSeries ? [rosterMarkerSeries] : []),
-                ],
-            };
-        }
-
-        return {
-        backgroundColor: 'transparent',
-        ...CHART_UPDATE_ANIMATION,
-        axisPointer: {
-            link: axisPointerLink,
-            animation: false,
-            lineStyle: { color: '#6c757d', type: 'dashed' },
-        },
-        tooltip: {
+        const tooltip = {
             ...chartTooltipStyle,
             trigger: 'axis',
             axisPointer: {
@@ -467,158 +296,114 @@ export default function ScoreTrendChart({
                 link: axisPointerLink,
                 animation: false,
                 snap: true,
-                lineStyle: { color: '#adb5bd', type: 'dashed' },
+                lineStyle: { color: CHART_COLORS.pointer, type: 'dashed' },
             },
-            formatter: buildTooltipFormatter(
-                stats.scoreTrend,
-                (seriesName, value) => (seriesName === 'Support Bonus' ? `${value}%` : formatScore(value)),
-                debugMode,
+            formatter: buildTrendTooltipFormatter(
+                trend,
+                (seriesName, value) => (seriesName === BONUS_LABEL ? `${value}%` : formatScore(value)),
+                debugMode ? (point) => point.fileName : undefined,
             ),
-        },
-        legend: {
-            data: legendData,
-            selected: echartsLegendSelected,
-            textStyle: { color: '#ced4da' },
-            bottom: 0,
-            itemWidth: 24,
-            itemHeight: 2,
-            icon: 'rect',
-        },
-        grid: [
-            { left: gridLeft, right: gridRight, top: 16, bottom: 114, containLabel: false },
-            { left: gridLeft, right: gridRight, top: 266, bottom: 48, containLabel: false },
-        ],
-        xAxis: [
-            {
-                type: 'category',
-                data: formattedDates,
-                boundaryGap: false,
-                axisLabel: { show: false },
-                axisTick: { alignWithLabel: true, show: false },
-                axisPointer: { show: true },
-                gridIndex: 0,
+        };
+        const base = {
+            backgroundColor: 'transparent',
+            textStyle: CHART_TEXT_STYLE,
+            ...CHART_UPDATE_ANIMATION,
+            axisPointer: {
+                link: axisPointerLink,
+                animation: false,
+                lineStyle: { color: CHART_COLORS.pointer, type: 'dashed' },
             },
-            {
-                type: 'category',
-                data: formattedDates,
-                boundaryGap: false,
-                axisLabel: {
-                    color: '#ced4da',
-                    interval: dateInterval,
-                    showMinLabel: true,
-                    showMaxLabel: true,
-                    alignMinLabel: 'left',
-                    alignMaxLabel: 'right',
+            tooltip,
+            legend: chartLegend(scale, { data: legendData, selected: echartsLegendSelected }),
+        };
+
+        if (!showBonusChart) {
+            return {
+                ...base,
+                grid: [{ ...insets, containLabel: false }],
+                xAxis: [trendIndexAxis(scale, formattedDates, view)],
+
+                yAxis: [scoreYAxis],
+                series: [
+                    ...scoreSeries,
+                    ...(rosterMarkerSeries ? [rosterMarkerSeries] : []),
+                ],
+            };
+        }
+
+        const bonusHeight = scale.px(60);
+        const bonusGap = scale.px(30);
+        return {
+            ...base,
+            grid: [
+                { ...insets, bottom: insets.bottom + bonusHeight + bonusGap, containLabel: false },
+                { ...insets, top: chartHeight - insets.bottom - bonusHeight, containLabel: false },
+            ],
+            xAxis: [
+                trendIndexAxis(scale, formattedDates, view, { showLabels: false }),
+                trendIndexAxis(scale, formattedDates, view, { gridIndex: 1 }),
+            ],
+
+            yAxis: [
+                scoreYAxis,
+                {
+                    ...trendValueAxis(scale, 'Bonus', (value: number) => `${value}%`, 'left', bonusYRange),
+                    min: bonusYRange.min,
+                    max: bonusYRange.max,
+                    interval: bonusYRange.max - bonusYRange.min,
+                    splitLine: { show: false },
+                    gridIndex: 1,
                 },
-                axisTick: { alignWithLabel: true },
-                axisPointer: { show: true },
-                gridIndex: 1,
-            },
-        ],
-        yAxis: [
-            {
-                type: 'value',
-                name: 'Score',
-                nameLocation: 'middle',
-                nameRotate: 90,
-                nameGap: 50,
-                min: scoreYRange.min,
-                max: scoreYRange.max,
-                axisLabel: {
-                    color: '#ced4da',
-                    fontSize: 11,
-                    width: 72,
-                    align: 'right',
-                    margin: 4,
-                    formatter: (value: number) => formatScore(value),
+            ],
+            series: [
+                ...scoreSeries,
+                {
+                    name: BONUS_LABEL,
+                    type: 'line',
+                    xAxisIndex: 1,
+                    yAxisIndex: 1,
+                    data: bonusPoints,
+                    step: 'end',
+                    showSymbol: false,
+                    areaStyle: { color: 'rgba(52, 211, 153, 0.18)' },
+                    itemStyle: { color: CHART_COLORS.positive },
+                    lineStyle: { width: 1 },
+                    z: 1,
                 },
-                splitLine: { lineStyle: { color: '#343a40' } },
-                axisLine: { show: true, lineStyle: { color: '#6c757d' } },
-                gridIndex: 0,
-            },
-            {
-                type: 'value',
-                name: 'Bonus %',
-                nameLocation: 'middle',
-                nameRotate: 90,
-                nameGap: 50,
-                min: bonusYRange.min,
-                max: bonusYRange.max,
-                interval: 1,
-                axisLabel: {
-                    color: '#ced4da',
-                    fontSize: 11,
-                    width: 72,
-                    align: 'right',
-                    margin: 4,
-                    formatter: (value: number) => `${value}%`,
-                },
-                splitLine: { show: false },
-                axisLine: { show: true, lineStyle: { color: '#6c757d' } },
-                gridIndex: 1,
-            },
-        ],
-        series: [
-            ...scoreSeries,
-            {
-                name: 'Support Bonus',
-                type: 'line',
-                xAxisIndex: 1,
-                yAxisIndex: 1,
-                data: bonusValues,
-                smooth: true,
-                showSymbol: false,
-                areaStyle: { color: 'rgba(117, 183, 152, 0.45)' },
-                itemStyle: { color: '#75b798' },
-                lineStyle: { width: 1 },
-                z: 1,
-            },
-            ...(rosterMarkerSeries ? [rosterMarkerSeries] : []),
-        ],
-    };
+                ...(rosterMarkerSeries ? [rosterMarkerSeries] : []),
+            ],
+        };
     }, [
-        activeScores,
-        activeEma,
-        activeSegmentAvg,
-        bonusValues,
+        scorePoints,
+        emaPoints,
+        segmentPoints,
+        bonusPoints,
+        activeEma.length,
         formattedDates,
-        dateInterval,
         emaLabel,
         scoreName,
         scoreYRange,
         bonusYRange,
-        gridLeft,
-        gridRight,
         showBonusChart,
-        rosterUpdateMarkLines,
-        stats.scoreTrend,
-        legendSelected,
+        trend,
+        view,
         echartsLegendSelected,
         debugMode,
         loadingRemaining,
+        scale,
+        chartHeight,
     ]);
 
     return (
-        <div>
-            <div className="position-relative trend-heading-with-controls">
-                <SectionHeading title="Score Progression" compact className="mt-0 pb-0" />
-                <div className="position-absolute top-0 end-0 d-flex align-items-center gap-2">
-                    <Form.Label className="text-secondary small mb-0">EMA Period</Form.Label>
-                    <Form.Control
-                        type="number"
-                        min={1}
-                        max={200}
-                        value={emaPeriod}
-                        onChange={(e) => {
-                            const next = Number(e.target.value);
-                            if (Number.isFinite(next) && next >= 1) setEmaPeriod(next);
-                        }}
-                        style={{ width: '5rem' }}
-                        size="sm"
-                    />
-                </div>
-            </div>
-            <ReactECharts option={option} onEvents={onEvents} style={{ height: isUmaView ? 280 : 360 }} />
+        <div className="chart-block">
+            <SectionHeading
+                title="Score Progression"
+                compact
+                actions={<TrendNumberInput label="EMA" value={emaPeriod} max={200} onChange={setEmaPeriod} />}
+            />
+            <EChart morph option={option} onEvents={onEvents} style={{ height: chartHeight }} />
         </div>
     );
 }
+
+export default memo(ScoreTrendChart);

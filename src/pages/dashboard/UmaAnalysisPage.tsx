@@ -12,18 +12,33 @@ import StatsPanels from '../../components/StatsPanels';
 import UmaLeaderboardSection from '../../components/UmaLeaderboardSection';
 import UmaRosterSummary from '../../components/UmaRosterSummary';
 import { useDashboardOutletContext } from './DashboardLayout';
-import { decodeBuildKey, HISTORICAL_PLACEHOLDER_LABEL, scrollToDashboardTop, umaProfilePath } from './utils';
+import {
+    HISTORICAL_PLACEHOLDER_LABEL,
+    resolveUmaProfileParam,
+    scrollToDashboardTop,
+    umaProfilePath,
+} from './utils';
 
 export default function UmaAnalysisPage() {
     const navigate = useNavigate();
-    const { buildKey: encodedBuildKey } = useParams();
-    const activeBuildKey = decodeBuildKey(encodedBuildKey);
+    const { umaSlug } = useParams();
     const {
         sessions,
         scoreBonuses,
         rosterGrid,
         historicalUmas,
     } = useDashboardOutletContext();
+    const knownUmas = useMemo(
+        () => [
+            ...rosterGrid.flat().filter((uma): uma is NonNullable<typeof uma> => !!uma),
+            ...historicalUmas,
+        ],
+        [rosterGrid, historicalUmas],
+    );
+    const activeBuildKey = useMemo(
+        () => resolveUmaProfileParam(umaSlug, knownUmas),
+        [umaSlug, knownUmas],
+    );
 
     const umaStats = useMemo(() => {
         if (!sessions.length || !activeBuildKey) return null;
@@ -45,8 +60,10 @@ export default function UmaAnalysisPage() {
     }, [activeBuildKey, historicalUmas, rosterGrid]);
 
     const selectUma = (buildKey: string) => {
+        const uma = knownUmas.find((candidate) => candidate.buildKey === buildKey);
+        if (!uma) return;
         scrollToDashboardTop();
-        navigate(umaProfilePath(buildKey));
+        navigate(umaProfilePath(uma));
     };
 
     const returnToSummary = () => {

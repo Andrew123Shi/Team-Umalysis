@@ -4,6 +4,7 @@ import {
     RaceSimulateData,
     RaceSimulateDataSchema,
     RaceSimulateData_EventDataWrapperSchema,
+    RaceSimulateEventData_SimulateEventType,
     RaceSimulateEventDataSchema,
     RaceSimulateFrameDataSchema,
     RaceSimulateHeaderDataSchema,
@@ -90,9 +91,7 @@ function deserializeEvent(view: DataView, offset: number) {
     return event;
 }
 
-function deserialize(input: Uint8Array) {
-    const view = new DataView(input.buffer, input.byteOffset, input.byteLength);
-
+function deserialize(view: DataView) {
     let [header, offset] = deserializeHeader(view);
     const data = create(RaceSimulateDataSchema, {header});
 
@@ -405,8 +404,7 @@ function parseSimEventsWithCountNearOffset(view: DataView, startGuess: number, e
     return bestEvents;
 }
 
-function deserializeJp(input: Uint8Array) {
-    const view = new DataView(input.buffer, input.byteOffset, input.byteLength);
+function deserializeJp(view: DataView) {
     const [header] = deserializeHeader(view);
     let offset = 4 + header.maxLength;
     ensureReadable(view, offset, RACE_STRUCT_SIZE);
@@ -467,17 +465,150 @@ function deserializeJp(input: Uint8Array) {
     });
 }
 
-function deserializeFromBase64(input: string) {
-    const decoded = pako.inflate(Uint8Array.from(atob(input), c => c.charCodeAt(0)));
+/**
+ * Just the parts of a race scenario that session ingest needs. Reading these directly
+ * from the buffer skips building a protobuf message for every horse in every frame.
+ */
+export type RaceScenarioSummary = {
+    maxLength: number;
+    horseNum: number;
+    frameTimes: number[];
+    /** Row-major by frame: frameDistances[frameIndex * horseNum + horseIndex]. */
+    frameDistances: number[];
+    /** finishTimeRaw per horseResult entry (0-indexed frame order). */
+    finishTimeRaw: number[];
+    /** Activated skill ids keyed by 0-indexed frame order, in event order. */
+    skillIdsByHorse: Map<number, number[]>;
+};
+
+const HORSE_FRAME_STRUCT_SIZE = 12;
+const HORSE_RESULT_STRUCT_SIZE = 31;
+const SKILL_EVENT_TYPE: number = RaceSimulateEventData_SimulateEventType.SKILL;
+
+function pushSkill(skillIdsByHorse: Map<number, number[]>, horse: number, skillId: number) {
+    const list = skillIdsByHorse.get(horse);
+    if (list) list.push(skillId);
+    else skillIdsByHorse.set(horse, [skillId]);
+}
+
+/** Same layout and bounds behavior as {@link deserialize}, but only keeps the summary fields. */
+function summarize(view: DataView): RaceScenarioSummary {
+    let [header, offset] = deserializeHeader(view);
+
+    const horseNum = view.getInt32(offset + 4, true);
+    const horseFrameSize = view.getInt32(offset + 8, true);
+    const horseResultSize = view.getInt32(offset + 12, true);
+    offset += RACE_STRUCT_SIZE;
+    offset += 4 + view.getInt32(offset, true);
+
+    const frameCount = view.getInt32(offset, true);
+    const frameSize = view.getInt32(offset + 4, true);
+    offset += 8;
+
+    const frameTimes: number[] = [];
+    const frameDistances: number[] = [];
+    for (let i = 0; i < frameCount; i++) {
+        frameTimes.push(view.getFloat32(offset, true));
+        let horseOffset = offset + 4;
+        for (let j = 0; j < horseNum; j++) {
+            ensureReadable(view, horseOffset, HORSE_FRAME_STRUCT_SIZE);
+            frameDistances.push(view.getFloat32(horseOffset, true));
+            horseOffset += horseFrameSize;
+        }
+        offset += frameSize;
+    }
+
+    offset += 4 + view.getInt32(offset, true);
+
+    const finishTimeRaw: number[] = [];
+    for (let i = 0; i < horseNum; i++) {
+        ensureReadable(view, offset, HORSE_RESULT_STRUCT_SIZE);
+        finishTimeRaw.push(view.getFloat32(offset + 27, true));
+        offset += horseResultSize;
+    }
+
+    offset += 4 + view.getInt32(offset, true);
+
+    const eventCount = view.getInt32(offset, true);
+    offset += 4;
+
+    const skillIdsByHorse = new Map<number, number[]>();
+    for (let i = 0; i < eventCount; i++) {
+        const eventSize = view.getInt16(offset, true);
+        offset += 2;
+        ensureReadable(view, offset, EVENT_STRUCT_SIZE);
+        const type = view.getInt8(offset + 4);
+        const paramCount = view.getInt8(offset + 5);
+        if (paramCount > 0) ensureReadable(view, offset + EVENT_STRUCT_SIZE, paramCount * 4);
+        if (type === SKILL_EVENT_TYPE && paramCount >= 2) {
+            pushSkill(
+                skillIdsByHorse,
+                view.getInt32(offset + EVENT_STRUCT_SIZE, true),
+                view.getInt32(offset + EVENT_STRUCT_SIZE + 4, true),
+            );
+        }
+        offset += eventSize;
+    }
+
+    return { maxLength: header.maxLength, horseNum, frameTimes, frameDistances, finishTimeRaw, skillIdsByHorse };
+}
+
+function summarizeRaceData(data: RaceSimulateData): RaceScenarioSummary {
+    const horseNum = data.horseNum ?? 0;
+    const frameDistances: number[] = [];
+    for (const frame of data.frame) {
+        for (let j = 0; j < horseNum; j++) frameDistances.push(frame.horseFrame[j]?.distance ?? 0);
+    }
+    const skillIdsByHorse = new Map<number, number[]>();
+    for (const wrapper of data.event) {
+        const event = wrapper.event;
+        if (event?.type === SKILL_EVENT_TYPE && event.param.length >= 2) {
+            pushSkill(skillIdsByHorse, event.param[0], event.param[1]);
+        }
+    }
+    return {
+        maxLength: data.header?.maxLength ?? 0,
+        horseNum,
+        frameTimes: data.frame.map((frame) => frame.time ?? 0),
+        frameDistances,
+        finishTimeRaw: data.horseResult.map((result) => result.finishTimeRaw),
+        skillIdsByHorse,
+    };
+}
+
+function base64ToBytes(input: string): Uint8Array {
+    const native = (Uint8Array as { fromBase64?: (s: string) => Uint8Array }).fromBase64;
+    if (native) return native.call(Uint8Array, input);
+    const binary = atob(input);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+}
+
+function decodeWithFallback<T>(
+    input: string,
+    globalReader: (view: DataView) => T,
+    jpReader: (view: DataView) => T,
+): T {
+    const decoded = pako.inflate(base64ToBytes(input));
+    const view = new DataView(decoded.buffer, decoded.byteOffset, decoded.byteLength);
     try {
-        return deserialize(decoded);
+        return globalReader(view);
     } catch (globalError: any) {
         try {
-            return deserializeJp(decoded);
+            return jpReader(view);
         } catch (jpError: any) {
             throw new Error(`Failed to parse race data. Global parser error: ${globalError?.message ?? String(globalError)}. JP parser error: ${jpError?.message ?? String(jpError)}`);
         }
     }
 }
 
-export {deserializeFromBase64};
+function deserializeFromBase64(input: string): RaceSimulateData {
+    return decodeWithFallback(input, deserialize, deserializeJp);
+}
+
+function summarizeFromBase64(input: string): RaceScenarioSummary {
+    return decodeWithFallback(input, summarize, (view) => summarizeRaceData(deserializeJp(view)));
+}
+
+export {deserializeFromBase64, summarizeFromBase64};

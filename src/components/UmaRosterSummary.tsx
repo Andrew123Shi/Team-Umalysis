@@ -1,124 +1,119 @@
-import { Card } from 'react-bootstrap';
-import { STYLE_SATURATION_COLORS } from '../analytics/styleSaturation';
-import type { RosterUmaSlot } from '../analytics/types';
+import { useMemo } from 'react';
+import type { NumericSummary, RosterUmaSlot } from '../analytics/types';
 import { DISTANCE_LABELS, DISTANCE_ORDER } from '../analytics/types';
-import AssetLoader from '../data/AssetLoader';
-import UMDatabaseWrapper from '../data/UMDatabaseWrapper';
-import CareerRatingBadge from './CareerRatingBadge';
-import SectionHeading from './SectionHeading';
 import { formatScore } from '../utils/formatScore';
+import RangeTrack, { FIELD_SIZE, rangeTip } from './charts/RangeTrack';
+import { useHoverTip, type TipContent } from './HoverTip';
+import { WinRateDonut } from './charts/WinRatePies';
+import { StatStrip, UmaIdentity } from './UmaCardParts';
 
-const STYLE_SHORT_LABELS: Record<number, string> = {
-    1: 'Front',
-    2: 'Pace',
-    3: 'Late',
-    4: 'End',
-    5: 'Front',
-};
+const ROSTER_ROWS = 3;
 
-const ROSTER_STAT_ITEMS = [
-    { key: 'speed' as const, icon: 'speed', alt: 'SPD' },
-    { key: 'stamina' as const, icon: 'stamina', alt: 'STA' },
-    { key: 'pow' as const, icon: 'power', alt: 'POW' },
-    { key: 'guts' as const, icon: 'guts', alt: 'GUT' },
-    { key: 'wiz' as const, icon: 'wit', alt: 'WIZ' },
-] as const;
+type ScoreDomain = { min: number; max: number };
 
-function fmtPct(v: number) {
-    return `${(v * 100).toFixed(1)}%`;
+function compactScore(value: number): string {
+    if (Math.abs(value) < 10_000) return formatScore(value);
+    return `${(value / 1000).toFixed(1)}k`;
 }
 
-function fmtNum(v: number, digits = 1) {
-    return v.toFixed(digits);
+function formatPosition(value: number): string {
+    return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
-function StarDisplay({ count }: { count: number }) {
-    if (count <= 0) return null;
-    const filled = Math.min(count, 5);
-    return (
-        <span className="uma-roster-sm-stars" aria-label={`${filled} stars`}>
-            {Array.from({ length: 5 }, (_, i) => (
-                <span key={i} className={i < filled ? 'uma-roster-sm-star is-filled' : 'uma-roster-sm-star'}>
-                    ★
-                </span>
-            ))}
-        </span>
-    );
-}
-
-function UmaRosterStatsBar({
-    stats,
-    totalSkillPoints,
+function TrackRow({
+    label,
+    summary,
+    format,
+    tip,
+    domainMin,
+    domainMax,
+    ticks,
+    color,
 }: {
-    stats: RosterUmaSlot['stats'];
-    totalSkillPoints: number;
+    label: string;
+    summary: NumericSummary;
+    format: (value: number) => string;
+    tip: TipContent;
+    domainMin: number;
+    domainMax: number;
+    ticks?: number;
+    color?: string;
 }) {
+    const { bind, tip: tipElement } = useHoverTip();
     return (
-        <div className="uma-roster-sm-stats">
-            {ROSTER_STAT_ITEMS.map(({ key, icon, alt }) => (
-                <div key={key} className="uma-roster-sm-stat">
-                    <img src={AssetLoader.getStatIcon(icon)} alt={alt} className="uma-roster-sm-stat-icon" />
-                    <span className="uma-roster-sm-stat-value">{stats[key]}</span>
-                </div>
-            ))}
-            <div className="uma-roster-sm-stat">
-                <img src={AssetLoader.getStatIcon('hint')} alt="Skill" className="uma-roster-sm-stat-icon" />
-                <span className="uma-roster-sm-stat-value">{totalSkillPoints}</span>
-            </div>
+        <div className="roster-track-row" {...bind(tip)}>
+            {tipElement}
+            <span className="roster-track-label">{label}</span>
+            <b className="roster-track-end">{format(summary.min)}</b>
+            <RangeTrack
+                min={summary.min}
+                max={summary.max}
+                avg={summary.avg}
+                median={summary.median}
+                domainMin={domainMin}
+                domainMax={domainMax}
+                ticks={ticks}
+                color={color}
+            />
+            <b className="roster-track-end">{format(summary.max)}</b>
         </div>
     );
 }
 
-function UmaRosterMetrics({ uma }: { uma: RosterUmaSlot }) {
+function UmaRosterMetrics({ uma, scoreDomain }: { uma: RosterUmaSlot; scoreDomain: ScoreDomain }) {
     const { placement, score } = uma;
 
     if (placement.count === 0) {
-        return <div className="uma-roster-metrics-empty text-muted">No race data</div>;
+        return <div className="roster-metrics-empty">No race data</div>;
     }
 
     return (
-        <div className="uma-roster-metrics">
-            <div className="uma-roster-metrics-primary-row">
-                <div className="uma-roster-metric uma-roster-metric--primary">
-                    <span className="uma-roster-metric-label">Win Rate</span>
-                    <span className="uma-roster-metric-value">{fmtPct(uma.winRate)}</span>
-                </div>
-                <div className="uma-roster-metric uma-roster-metric--primary">
-                    <span className="uma-roster-metric-label">Avg Score</span>
-                    <span className="uma-roster-metric-value">{formatScore(score.avg)}</span>
-                </div>
-                <div className="uma-roster-metric uma-roster-metric--primary">
-                    <span className="uma-roster-metric-label">Races Run</span>
-                    <span className="uma-roster-metric-value">{placement.count}</span>
-                </div>
-            </div>
-            <div className="uma-roster-metrics-grid">
-                <div className="uma-roster-metric">
-                    <span className="uma-roster-metric-label">Avg Pos</span>
-                    <span className="uma-roster-metric-value">{fmtNum(placement.avg)}</span>
-                </div>
-                <div className="uma-roster-metric">
-                    <span className="uma-roster-metric-label">Med Pos</span>
-                    <span className="uma-roster-metric-value">{fmtNum(placement.median)}</span>
-                </div>
-                <div className="uma-roster-metric">
-                    <span className="uma-roster-metric-label">Max Pos</span>
-                    <span className="uma-roster-metric-value">{fmtNum(placement.max, 0)}</span>
+        <div className="roster-metrics">
+            <div className="roster-metrics-top">
+                <WinRateDonut value={uma.winRate} size="sm" />
+                <div className="roster-figures">
+                    <div className="roster-fig has-row-labels">
+                        <span />
+                        <span className="roster-fig-head">Score</span>
+                        <span className="roster-fig-row-label">Avg</span>
+                        <b>{formatScore(score.avg)}</b>
+                        <span className="roster-fig-row-label">Med</span>
+                        <b className="is-median">{formatScore(score.median)}</b>
+                    </div>
+                    <div className="roster-fig">
+                        <span className="roster-fig-head">Pos</span>
+                        <b>{placement.avg.toFixed(2)}</b>
+                        <b className="is-median">{formatPosition(placement.median)}</b>
+                    </div>
+                    <div className="roster-fig is-single">
+                        <span className="roster-fig-head">Races</span>
+                        <b>{placement.count}</b>
+                    </div>
                 </div>
             </div>
-            <div className="uma-roster-metrics-grid">
-                <div className="uma-roster-metric">
-                    <span className="uma-roster-metric-label">Med Score</span>
-                    <span className="uma-roster-metric-value">{formatScore(score.median)}</span>
-                </div>
-                <div className="uma-roster-metric">
-                    <span className="uma-roster-metric-label">Min Score</span>
-                    <span className="uma-roster-metric-value">{formatScore(score.min)}</span>
-                </div>
-                <div className="uma-roster-metric">
-                    <span className="uma-roster-metric-label">Max Score</span>
-                    <span className="uma-roster-metric-value">{formatScore(score.max)}</span>
-                </div>
+            <div className="roster-tracks">
+                <TrackRow
+                    label="Pos"
+                    summary={placement}
+                    format={formatPosition}
+                    tip={rangeTip('Finishing Position', placement, formatPosition, {
+                        minLabel: 'Best',
+                        maxLabel: 'Worst',
+                        avgFormat: (value) => value.toFixed(2),
+                    })}
+                    domainMin={1}
+                    domainMax={FIELD_SIZE}
+                    ticks={FIELD_SIZE}
+                />
+                <TrackRow
+                    label="Score"
+                    summary={score}
+                    format={compactScore}
+                    tip={rangeTip('Race Score', score, formatScore, { color: '#4d9fff' })}
+                    domainMin={scoreDomain.min}
+                    domainMax={scoreDomain.max}
+                    color="#4d9fff"
+                />
             </div>
         </div>
     );
@@ -126,17 +121,16 @@ function UmaRosterMetrics({ uma }: { uma: RosterUmaSlot }) {
 
 function UmaRosterCard({
     uma,
+    scoreDomain,
     onSelect,
 }: {
     uma: RosterUmaSlot;
+    scoreDomain: ScoreDomain;
     onSelect?: (buildKey: string) => void;
 }) {
-    const outfitName = UMDatabaseWrapper.cards[uma.cardId]?.name;
-    const styleLabel = STYLE_SHORT_LABELS[uma.runningStyle] ?? 'Pace';
-    const styleColor = STYLE_SATURATION_COLORS[uma.runningStyle] ?? STYLE_SATURATION_COLORS[2];
     return (
-        <Card
-            className="app-card h-100 uma-roster-card uma-roster-member"
+        <div
+            className={`app-card uma-roster-card${onSelect ? ' is-clickable' : ''}`}
             role={onSelect ? 'button' : undefined}
             tabIndex={onSelect ? 0 : undefined}
             onClick={onSelect ? () => onSelect(uma.buildKey) : undefined}
@@ -147,44 +141,16 @@ function UmaRosterCard({
                 }
             } : undefined}
         >
-            <Card.Body className="uma-roster-member-body">
-                <div className="uma-roster-sm-header">
-                    <img
-                        src={AssetLoader.getRacewearIcon(uma.cardId)}
-                        alt=""
-                        className="uma-roster-sm-avatar"
-                    />
-                    <div className="uma-roster-sm-info">
-                        <div className="uma-roster-sm-name">
-                            {outfitName && (
-                                <div className="uma-roster-sm-outfit text-truncate">{outfitName}</div>
-                            )}
-                            <div className="uma-roster-sm-chara-line">
-                                <span className="uma-roster-sm-chara text-truncate">{uma.charaName}</span>
-                                <StarDisplay count={uma.starCount} />
-                            </div>
-                        </div>
-                        <div className="uma-roster-sm-tags">
-                            <span
-                                className="uma-roster-sm-tag style"
-                                style={{
-                                    color: styleColor,
-                                    background: `color-mix(in srgb, ${styleColor} 18%, transparent)`,
-                                }}
-                            >
-                                {styleLabel}
-                            </span>
-                        </div>
-                    </div>
-                    <div className="uma-roster-sm-rank-block">
-                        <CareerRatingBadge score={uma.rankScore} size={48} />
-                        <span className="uma-roster-sm-score-value">{formatScore(uma.rankScore)}</span>
-                    </div>
-                </div>
-                <UmaRosterStatsBar stats={uma.stats} totalSkillPoints={uma.totalSkillPoints} />
-                <UmaRosterMetrics uma={uma} />
-            </Card.Body>
-        </Card>
+            <UmaIdentity
+                cardId={uma.cardId}
+                charaName={uma.charaName}
+                rankScore={uma.rankScore}
+                starCount={uma.starCount}
+                runningStyle={uma.runningStyle}
+            />
+            <StatStrip stats={uma.stats} totalSkillPoints={uma.totalSkillPoints} compact />
+            <UmaRosterMetrics uma={uma} scoreDomain={scoreDomain} />
+        </div>
     );
 }
 
@@ -195,33 +161,38 @@ export default function UmaRosterSummary({
     rosterGrid: (RosterUmaSlot | null)[][];
     onSelectUma?: (buildKey: string) => void;
 }) {
-    const rowCount = 3;
+    // Score whiskers share one roster-wide domain so tiles compare at a glance.
+    const scoreDomain = useMemo<ScoreDomain>(() => {
+        const withData = rosterGrid.flat().filter((uma): uma is RosterUmaSlot => !!uma && uma.score.count > 0);
+        if (withData.length === 0) return { min: 0, max: 1 };
+        return {
+            min: Math.min(...withData.map((uma) => uma.score.min)),
+            max: Math.max(...withData.map((uma) => uma.score.max)),
+        };
+    }, [rosterGrid]);
 
     return (
-        <div className="uma-roster-grid row g-2 mb-3">
-            {DISTANCE_ORDER.map((distanceType, colIdx) => {
-                const column = rosterGrid[colIdx] ?? [];
-                return (
-                    <div key={distanceType} className="col uma-roster-col">
-                        <div className="uma-roster-distance-panel app-card h-100">
-                            <SectionHeading
-                                level="panel"
-                                title={DISTANCE_LABELS[distanceType]}
-                                compact
-                                className="uma-roster-distance-header mt-0"
-                            />
-                            <div className="uma-roster-distance-slots">
-                                {Array.from({ length: rowCount }, (_, rowIdx) => {
+        <div className="uma-roster">
+            <div className="uma-roster-grid">
+                {DISTANCE_ORDER.map((distanceType, colIdx) => {
+                    const column = rosterGrid[colIdx] ?? [];
+                    return (
+                        <div key={distanceType} className="uma-roster-col">
+                            <div className="uma-roster-col-head">
+                                <span className="uma-roster-col-title">{DISTANCE_LABELS[distanceType]}</span>
+                            </div>
+                            <div className="uma-roster-slots">
+                                {Array.from({ length: ROSTER_ROWS }, (_, rowIdx) => {
                                     const uma = column[rowIdx];
                                     return uma
-                                        ? <UmaRosterCard key={rowIdx} uma={uma} onSelect={onSelectUma} />
-                                        : <div key={rowIdx} className="uma-roster-empty" />;
+                                        ? <UmaRosterCard key={rowIdx} uma={uma} scoreDomain={scoreDomain} onSelect={onSelectUma} />
+                                        : <div key={rowIdx} className="uma-roster-empty">Empty slot</div>;
                                 })}
                             </div>
                         </div>
-                    </div>
-                );
-            })}
+                    );
+                })}
+            </div>
         </div>
     );
 }

@@ -1,4 +1,5 @@
 import { formatScore } from '../utils/formatScore';
+import { AnimatedText } from './AnimatedNumber';
 import { getRankIcon } from '../utils/rankUtils';
 
 export function formatRatingHtml(rankScore: number, showLabel = true): string {
@@ -24,7 +25,7 @@ export default function RatingDisplay({
         <span className={`rating-display${className ? ` ${className}` : ''}`}>
             {showLabel && <span className="rating-display-label">{label} </span>}
             <img src={icon} alt={name} className="rating-display-icon" />
-            <span className="rating-display-score">{formatScore(rankScore)}</span>
+            <span className="rating-display-score"><AnimatedText text={formatScore(rankScore)} /></span>
         </span>
     );
 }

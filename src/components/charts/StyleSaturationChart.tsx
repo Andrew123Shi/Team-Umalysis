@@ -1,5 +1,5 @@
-import { useMemo, useRef, useState } from 'react';
-import ReactECharts from 'echarts-for-react';
+import { useId, useMemo, useRef, useState } from 'react';
+import EChart from './EChart';
 import { Button, ButtonGroup, Card, Form } from 'react-bootstrap';
 
 import {
@@ -10,7 +10,17 @@ import {
 } from '../../analytics/styleSaturation';
 import type { TTRound } from '../../analytics/types';
 import SectionHeading from '../SectionHeading';
-import { chartTooltipStyle } from './chartTooltip';
+import { chartTooltipStyle, tooltipHead, tooltipRow } from './chartTooltip';
+import {
+    CHART_AXIS_LINE,
+    CHART_COLORS,
+    CHART_SPLIT_LINE,
+    CHART_TEXT_STYLE,
+    chartAxisLabel,
+    chartAxisName,
+    chartLegend,
+    useChartScale,
+} from './chartTheme';
 
 export default function StyleSaturationChart({
     rounds,
@@ -19,6 +29,8 @@ export default function StyleSaturationChart({
     rounds: TTRound[];
     buildKey: string;
 }) {
+    const scale = useChartScale();
+    const includeTeamId = useId();
     const [roomScope, setRoomScope] = useState<StyleSaturationOptions['roomScope']>(
         DEFAULT_STYLE_SATURATION_OPTIONS.roomScope,
     );
@@ -58,9 +70,11 @@ export default function StyleSaturationChart({
 
     const option = useMemo(() => ({
         backgroundColor: 'transparent',
+        textStyle: CHART_TEXT_STYLE,
         tooltip: {
             ...chartTooltipStyle,
             trigger: 'axis',
+            axisPointer: { type: 'line', lineStyle: { color: CHART_COLORS.pointer, type: 'dashed' } },
             formatter: (params: unknown) => {
                 const items = (Array.isArray(params) ? params : [params]) as {
                     axisValue?: string;
@@ -70,111 +84,106 @@ export default function StyleSaturationChart({
                     data?: { races?: number };
                 }[];
                 if (items.length === 0) return '';
-                const header = `${items[0].axisValue ?? ''} in room`;
-                const lines = items
+                const rows = items
                     .filter((item) => item.value != null && Number.isFinite(item.value))
-                    .map((item) => {
-                        const races = item.data?.races ?? 0;
-                        return `${item.marker ?? ''}${item.seriesName ?? ''}: ${item.value!.toFixed(1)}% · n=${races}`;
-                    });
-                return [`<b>${header}</b>`, ...lines.map((line) => `<b>${line}</b>`)].join('<br/>');
+                    .map((item) => tooltipRow(
+                        `${item.marker ?? ''}${item.seriesName ?? ''}`,
+                        `${item.value!.toFixed(1)}% · n=${item.data?.races ?? 0}`,
+                    ));
+                return tooltipHead(`${items[0].axisValue ?? ''} In Room`) + rows.join('');
             },
         },
-        legend: {
-            data: data.map((series) => series.label),
-            textStyle: { color: '#ced4da' },
-            bottom: 0,
-            type: 'scroll',
-        },
+        legend: chartLegend(scale, { data: data.map((series) => series.label), type: 'scroll' }),
         grid: {
-            left: 32,
-            right: 16,
-            top: 24,
-            bottom: 56,
+            left: scale.px(4),
+            right: scale.px(12),
+            top: scale.px(14),
+            bottom: scale.px(60),
             containLabel: true,
         },
         xAxis: {
             type: 'category',
-            name: 'Number of Umas',
+            name: 'Umas of style in room',
             nameLocation: 'middle',
-            nameGap: 28,
+            nameGap: scale.px(32),
+            nameTextStyle: chartAxisName(scale),
             boundaryGap: false,
             data: xLabels,
-            axisLabel: { color: '#ced4da' },
-            axisLine: { lineStyle: { color: '#6c757d' } },
+            axisTick: { show: false },
+            axisLabel: chartAxisLabel(scale),
+            axisLine: CHART_AXIS_LINE,
         },
         yAxis: {
             type: 'value',
-            name: 'Win Rate',
-            nameLocation: 'middle',
-            nameGap: 46,
             min: 0,
             max: 100,
-            axisLabel: {
-                color: '#ced4da',
-                formatter: (value: number) => `${value}%`,
-            },
-            splitLine: { lineStyle: { color: '#343a40' } },
-            axisLine: { show: true, lineStyle: { color: '#6c757d' } },
+            interval: 25,
+            axisLabel: chartAxisLabel(scale, { formatter: (value: number) => `${value}%` }),
+            splitLine: CHART_SPLIT_LINE,
         },
-        series: data.map((series) => ({
-            name: series.label,
-            type: 'line',
-            smooth: true,
-            showSymbol: true,
-            symbolSize: 6,
-            connectNulls: false,
-            itemStyle: { color: STYLE_SATURATION_COLORS[series.styleId] ?? '#adb5bd' },
-            lineStyle: { width: 2, color: STYLE_SATURATION_COLORS[series.styleId] ?? '#adb5bd' },
-            data: xLabels.map((label) => {
-                const point = series.points.find((entry) => entry.count === Number(label));
-                if (!point || point.races === 0) return null;
-                return {
-                    value: point.winRate * 100,
-                    races: point.races,
-                };
-            }),
-        })),
-    }), [data, xLabels]);
+        series: data.map((series) => {
+            const color = STYLE_SATURATION_COLORS[series.styleId] ?? CHART_COLORS.legend;
+            return {
+                name: series.label,
+                type: 'line',
+                smooth: true,
+                showSymbol: true,
+                symbol: 'circle',
+                symbolSize: scale.px(6),
+                connectNulls: false,
+                itemStyle: { color, borderColor: '#0b0d11', borderWidth: 1.5 },
+                lineStyle: { width: 2, color },
+                data: xLabels.map((label) => {
+                    const point = series.points.find((entry) => entry.count === Number(label));
+                    if (!point || point.races === 0) return null;
+                    return {
+                        value: point.winRate * 100,
+                        races: point.races,
+                    };
+                }),
+            };
+        }),
+    }), [data, xLabels, scale]);
 
     const hasData = data.some((series) => series.points.some((point) => point.races > 0));
 
     return (
         <Card className="app-card h-100">
             <Card.Body>
-                <div className="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-1">
-                    <SectionHeading title="Style Sensitivity" compact className="mt-0" />
-                    <div className="d-flex flex-wrap align-items-center gap-2">
-                        <ButtonGroup size="sm">
-                            <Button
-                                variant={roomScope === 'total' ? 'secondary' : 'outline-secondary'}
-                                onClick={() => handleRoomScopeChange('total')}
-                            >
-                                Total Room
-                            </Button>
-                            <Button
-                                variant={roomScope === 'opponent' ? 'secondary' : 'outline-secondary'}
-                                onClick={() => handleRoomScopeChange('opponent')}
-                            >
-                                Opponent Only
-                            </Button>
-                        </ButtonGroup>
-                        <Form.Check
-                            type="switch"
-                            id="style-saturation-include-team"
-                            label="Include Own Team"
-                            checked={includeTeam}
-                            onChange={(event) => handleIncludeTeamChange(event.target.checked)}
-                            className="mb-0 small text-secondary"
-                        />
-                    </div>
-                </div>
-                <div className="small text-muted mb-2">
-                    Win rate vs. how many umas of each style are in the race                </div>
+                <SectionHeading
+                    title="Style Sensitivity"
+                    info="Win rate vs. how many umas of each style are in the race"
+                    actions={(
+                        <div className="chart-tools is-stacked">
+                            <ButtonGroup size="sm">
+                                <Button
+                                    variant={roomScope === 'total' ? 'secondary' : 'outline-secondary'}
+                                    onClick={() => handleRoomScopeChange('total')}
+                                >
+                                    Full Room
+                                </Button>
+                                <Button
+                                    variant={roomScope === 'opponent' ? 'secondary' : 'outline-secondary'}
+                                    onClick={() => handleRoomScopeChange('opponent')}
+                                >
+                                    Opponents
+                                </Button>
+                            </ButtonGroup>
+                            <Form.Check
+                                type="switch"
+                                id={includeTeamId}
+                                label="Own team"
+                                checked={includeTeam}
+                                onChange={(event) => handleIncludeTeamChange(event.target.checked)}
+                                className="chart-switch"
+                            />
+                        </div>
+                    )}
+                />
                 {hasData ? (
-                    <ReactECharts option={option} style={{ height: 320 }} />
+                    <EChart option={option} style={{ height: scale.px(300) }} />
                 ) : (
-                    <div className="text-muted small py-4 text-center">Not enough data</div>
+                    <div className="empty-note">Not enough data</div>
                 )}
             </Card.Body>
         </Card>

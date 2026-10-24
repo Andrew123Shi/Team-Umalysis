@@ -1,21 +1,14 @@
-/** Shared layout for side-by-side opponent bar charts (style composition + strength). */
-export const BAR_CHART_HEIGHT = 240;
+import { MOTION_MS } from '../motion';
 
-export const BAR_CHART_GRID = {
-    left: 8,
-    right: 8,
-    top: 48,
-    bottom: 36,
-    containLabel: true,
-} as const;
-
-/** Style composition y-axis names need a touch more canvas to match strength plot height. */
-export const STYLE_COMPOSITION_CHART_HEIGHT = BAR_CHART_HEIGHT + 3;
-
+/**
+ * Trend charts draw in over 1s like the other line charts (the ECharts
+ * default); later changes are morphed by `EChart`, and anything ECharts still
+ * animates itself (legend toggles) uses the shared easeOutQuint motion.
+ */
 export const CHART_UPDATE_ANIMATION = {
     animation: true,
-    animationDuration: 240,
-    animationDurationUpdate: 420,
+    animationDuration: 1000,
     animationEasing: 'cubicOut',
-    animationEasingUpdate: 'cubicOut',
+    animationDurationUpdate: MOTION_MS,
+    animationEasingUpdate: 'quinticOut',
 } as const;

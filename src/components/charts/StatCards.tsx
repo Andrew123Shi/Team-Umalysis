@@ -1,538 +1,343 @@
-import type { ReactNode } from 'react';
-import { Card, Col, Row } from 'react-bootstrap';
+import { useMemo, type ReactNode } from 'react';
 import type { AggregatedStats, NumericSummary } from '../../analytics/types';
 import { formatScore } from '../../utils/formatScore';
 import { AnimatedText } from '../AnimatedNumber';
 import SectionHeading from '../SectionHeading';
-import { WinRateDonut, WinRateLegend, WinRateRings, TeamPlacementRings } from './WinRatePies';
-
-function fmtNum(v: number, digits = 1) {
-    return v.toFixed(digits);
-}
-
-function SummaryCard({
-    title,
-    summary,
-    suffix = '',
-    hideMin = false,
-    hideCount = false,
-    roundAvg = false,
-}: {
-    title: string;
-    summary: NumericSummary;
-    suffix?: string;
-    hideMin?: boolean;
-    hideCount?: boolean;
-    roundAvg?: boolean;
-}) {
-    if (summary.count === 0) {
-        return (
-            <Card className="app-card h-100">
-                <Card.Body>
-                    <SectionHeading level="card" title={title} />
-                    <div className="text-muted">No data</div>
-                </Card.Body>
-            </Card>
-        );
-    }
-    const avgDisplay = roundAvg ? formatScore(summary.avg) : fmtNum(summary.avg);
-    const medDisplay = roundAvg ? formatScore(summary.median) : fmtNum(summary.median);
-    const minDisplay = roundAvg ? formatScore(summary.min) : fmtNum(summary.min);
-    const maxDisplay = roundAvg ? formatScore(summary.max) : fmtNum(summary.max);
-    const minMaxLine = hideMin
-        ? `med ${medDisplay}${suffix} · max ${maxDisplay}${suffix}`
-        : `med ${medDisplay}${suffix} · min ${minDisplay}${suffix} · max ${maxDisplay}${suffix}`;
-    return (
-        <Card className="app-card h-100">
-            <Card.Body>
-                <SectionHeading level="card" title={title} />
-                <div className="metric-value"><AnimatedText text={`${avgDisplay}${suffix}`} /></div>
-                <div className="small metric-detail">
-                    <AnimatedText text={minMaxLine} />
-                </div>
-                {!hideCount && <div className="small metric-detail"><AnimatedText text={`n=${summary.count}`} /></div>}
-            </Card.Body>
-        </Card>
-    );
-}
+import Histogram, { buildContinuousBins, type HistogramBin } from './Histogram';
+import { OUTCOME_COLORS, WinRateDonut, WinRateLegend, WinRateRings, TeamPlacementRings } from './WinRatePies';
 
 export type StatCardViewMode = 'team' | 'uma' | 'distance';
 
-function ScoreSummary({
+/** Gold / silver / bronze for the podium, then tan for the remaining scoring places. */
+const PLACE_COLORS = ['#f2c14e', '#c9d1d9', '#d08a4f', '#e8d4b6', '#e8d4b6'];
+
+function ordinal(n: number): string {
+    const mod100 = n % 100;
+    if (mod100 >= 11 && mod100 <= 13) return `${n}th`;
+    const suffix = ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th';
+    return `${n}${suffix}`;
+}
+
+function formatPosition(value: number): string {
+    return Number.isInteger(value) ? ordinal(value) : value.toFixed(1);
+}
+
+function KpiCard({
     title,
-    avg,
-    median,
-    min,
-    max,
-    inGameAvg,
-    compact = false,
+    className = '',
+    children,
 }: {
     title: string;
-    avg: number;
-    median: number;
-    min: number;
-    max: number;
+    className?: string;
+    children: ReactNode;
+}) {
+    return (
+        <section className={['app-card', 'kpi-card', className].filter(Boolean).join(' ')}>
+            <SectionHeading title={title} />
+            {children}
+        </section>
+    );
+}
+
+function KpiCount({ value, total, label }: { value: number; total: number; label: string }) {
+    return (
+        <div className="kpi-count">
+            <strong><AnimatedText text={String(value)} /><span>/<AnimatedText text={String(total)} /></span></strong>
+            <span className="kpi-count-label">{label}</span>
+        </div>
+    );
+}
+
+function MetaItem({ label, value }: { label: string; value: string }) {
+    return (
+        <div className="kpi-meta-item">
+            <dt>{label}</dt>
+            <dd><AnimatedText text={value} /></dd>
+        </div>
+    );
+}
+
+function ScoreKpi({
+    title,
+    summary,
+    inGameAvg,
+    values,
+    scaleValues,
+    unit,
+}: {
+    title: string;
+    summary: NumericSummary;
     /** Shown only when the score bonus settings make avg differ from the in-game score. */
     inGameAvg?: number;
-    compact?: boolean;
+    values: number[];
+    /** Full-history scores the bin width is taken from, so every scope shares bins. */
+    scaleValues?: number[];
+    unit: string;
 }) {
+    const bins = useMemo(() => buildContinuousBins(values, scaleValues), [values, scaleValues]);
+    if (summary.count === 0) {
+        return (
+            <KpiCard title={title}>
+                <div className="empty-note">No data</div>
+            </KpiCard>
+        );
+    }
+    const showInGame = inGameAvg !== undefined && Math.round(inGameAvg) !== Math.round(summary.avg);
+    const hasHistogram = values.length >= 3;
+
     return (
-        <Card className={`app-card h-100${compact ? ' overview-score-card' : ''}`}>
-            <Card.Body>
-                <SectionHeading title={title} compact className="mt-0" />
-                <div className="score-summary-layout">
-                    <div className="metric-value"><AnimatedText text={formatScore(avg)} /></div>
-                    <div className="score-summary-details">
-                        <span><strong>Med</strong> <AnimatedText text={formatScore(median)} /></span>
-                        {compact ? (
-                            <div className="score-summary-minmax">
-                                <span><strong>Min</strong> <AnimatedText text={formatScore(min)} /></span>
-                                <span><strong>Max</strong> <AnimatedText text={formatScore(max)} /></span>
-                            </div>
-                        ) : (
-                            <>
-                                <span><strong>Min</strong> <AnimatedText text={formatScore(min)} /></span>
-                                <span><strong>Max</strong> <AnimatedText text={formatScore(max)} /></span>
-                            </>
-                        )}
-                        {inGameAvg !== undefined && Math.round(inGameAvg) !== Math.round(avg) && (
-                            <span><strong>In-Game Avg</strong> <AnimatedText text={formatScore(inGameAvg)} /></span>
-                        )}
-                    </div>
-                </div>
-            </Card.Body>
-        </Card>
+        <KpiCard title={title} className="kpi-score">
+            <div className="kpi-head">
+                <div className="kpi-figure"><AnimatedText text={formatScore(summary.avg)} /></div>
+                <dl className="kpi-meta">
+                    {!hasHistogram && <MetaItem label="Median" value={formatScore(summary.median)} />}
+                    {showInGame && <MetaItem label="In-game" value={formatScore(inGameAvg)} />}
+                </dl>
+            </div>
+            {hasHistogram && (
+                <Histogram
+                    bins={bins}
+                    avg={summary.avg}
+                    median={summary.median}
+                    min={summary.min}
+                    max={summary.max}
+                    format={formatScore}
+                    unit={unit}
+                />
+            )}
+        </KpiCard>
     );
 }
 
-function TeamPlacementRateCard({
-    allPodiumRate,
-    allPlacedRate,
-    raceCount,
-    compact = false,
-}: {
-    allPodiumRate: number;
-    allPlacedRate: number;
-    raceCount: number;
-    compact?: boolean;
-}) {
-    const allPodiumRaces = Math.round(allPodiumRate * raceCount);
-    const allPlacedRaces = Math.round(allPlacedRate * raceCount);
-
-    return (
-        <Card className={`app-card h-100${compact ? ' overview-win-rate-card' : ''}`}>
-            <Card.Body>
-                <SectionHeading title="Team Placement" compact className="mt-0" />
-                <div className="win-rate-card-layout">
-                    <TeamPlacementRings allPodiumRate={allPodiumRate} allPlacedRate={allPlacedRate} />
-                    <div className="win-rate-dual-counts">
-                        <div className="win-rate-count">
-                            <strong><AnimatedText text={`${allPodiumRaces}/${raceCount}`} /></strong>
-                            <span>All Podiumed</span>
-                        </div>
-                        <div className="win-rate-count">
-                            <strong><AnimatedText text={`${allPlacedRaces}/${raceCount}`} /></strong>
-                            <span>All Placed</span>
-                        </div>
-                    </div>
-                    <WinRateLegend
-                        items={[
-                            { label: 'All Podium (1st/2nd/3rd)', value: allPodiumRate, color: '#64b5f6' },
-                            { label: 'All Placed (≤5th)', value: allPlacedRate, color: '#66bb6a' },
-                        ]}
-                    />
-                </div>
-            </Card.Body>
-        </Card>
-    );
-}
-
-function RaceWinRateCard({
+function RaceRatesBlock({
     winRate,
     top2,
     top3,
     raceCount,
     raceWins,
-    compact = false,
 }: {
     winRate: number;
     top2: number;
     top3: number;
     raceCount: number;
     raceWins: number;
-    compact?: boolean;
 }) {
     return (
-        <Card className={`app-card h-100${compact ? ' overview-win-rate-card' : ''}`}>
-            <Card.Body>
-                <SectionHeading title="Race Win Rate" compact className="mt-0" />
-                <div className="win-rate-card-layout">
-                    <WinRateRings winRate={winRate} top2Rate={top2} top3Rate={top3} />
-                    <div className="win-rate-count">
-                        <strong><AnimatedText text={`${raceWins}/${raceCount}`} /></strong>
-                        <span>Races Won</span>
-                    </div>
-                    <WinRateLegend
-                        items={[
-                            { label: 'Win', value: winRate, color: '#66bb6a' },
-                            { label: 'Top 2', value: top2, color: '#ffca28' },
-                            { label: 'Top 3', value: top3, color: '#fd7e14' },
-                        ]}
-                    />
-                </div>
-            </Card.Body>
-        </Card>
+        <div className="ring-stat">
+            <WinRateRings winRate={winRate} top2Rate={top2} top3Rate={top3} />
+            <div className="ring-stat-body">
+                <KpiCount value={raceWins} total={raceCount} label="races won" />
+                <WinRateLegend
+                    items={[
+                        { label: 'Win', value: winRate, color: OUTCOME_COLORS.win },
+                        { label: 'Top 2', value: top2, color: OUTCOME_COLORS.top2 },
+                        { label: 'Top 3', value: top3, color: OUTCOME_COLORS.top3 },
+                    ]}
+                />
+            </div>
+        </div>
     );
 }
 
 function TeamWinRatesCard({
     stats,
-    primaryWinRate,
-    primaryTop2,
-    primaryTop3,
+    winRate,
+    top2,
+    top3,
     raceCount,
     raceWins,
-    compact = false,
 }: {
     stats: AggregatedStats;
-    primaryWinRate: number;
-    primaryTop2: number;
-    primaryTop3: number;
+    winRate: number;
+    top2: number;
+    top3: number;
     raceCount: number;
     raceWins: number;
-    compact?: boolean;
 }) {
+    const trialWins = Math.round(stats.sessionWinRate * stats.totalSessions);
     return (
-        <Card className={`app-card h-100${compact ? ' overview-win-rate-card' : ''}`}>
-            <Card.Body>
-                <SectionHeading title="Win Rate" compact className="mt-0" />
-                <div className="win-rate-comparison-grid">
-                    <div className="win-rate-panel">
-                        <div className="win-rate-panel-title">Overall Win Rate</div>
-                        <div className="win-rate-card-layout">
-                            <WinRateDonut value={stats.sessionWinRate} />
-                            <div className="win-rate-count">
-                                <strong><AnimatedText text={`${Math.round(stats.sessionWinRate * stats.totalSessions)}/${stats.totalSessions}`} /></strong>
-                                <span>Trials Won</span>
-                            </div>
-                            <div className="win-rate-legend-spacer" aria-hidden="true" />
-                        </div>
-                    </div>
-                    <div className="win-rate-panel">
-                        <div className="win-rate-panel-title">Race Win Rate</div>
-                        <div className="win-rate-card-layout">
-                            <WinRateRings winRate={primaryWinRate} top2Rate={primaryTop2} top3Rate={primaryTop3} />
-                            <div className="win-rate-count">
-                                <strong><AnimatedText text={`${raceWins}/${raceCount}`} /></strong>
-                                <span>Races Won</span>
-                            </div>
+        <KpiCard title="Win Rate" className="kpi-win-rates">
+            <div className="kpi-split">
+                <div className="kpi-split-cell">
+                    <div className="kpi-sublabel">Trials</div>
+                    <div className="ring-stat">
+                        <WinRateDonut value={stats.sessionWinRate} />
+                        <div className="ring-stat-body">
+                            <KpiCount value={trialWins} total={stats.totalSessions} label="trials won" />
                             <WinRateLegend
                                 items={[
-                                    { label: 'Win', value: primaryWinRate, color: '#66bb6a' },
-                                    { label: 'Top 2', value: primaryTop2, color: '#ffca28' },
-                                    { label: 'Top 3', value: primaryTop3, color: '#fd7e14' },
+                                    { label: 'Win', value: stats.sessionWinRate, color: OUTCOME_COLORS.win },
+                                    { label: 'Loss', value: 1 - stats.sessionWinRate, color: OUTCOME_COLORS.loss },
                                 ]}
                             />
                         </div>
                     </div>
                 </div>
-            </Card.Body>
-        </Card>
+                <div className="kpi-split-cell">
+                    <div className="kpi-sublabel">Races</div>
+                    <RaceRatesBlock winRate={winRate} top2={top2} top3={top3} raceCount={raceCount} raceWins={raceWins} />
+                </div>
+            </div>
+        </KpiCard>
     );
 }
 
-function AverageTotalScoreCard({
-    stats,
-    isUmaView,
-    isDistanceView,
-    compact = false,
+function TeamPlacementCard({
+    allPodiumRate,
+    allPlacedRate,
+    raceCount,
 }: {
-    stats: AggregatedStats;
-    isUmaView: boolean;
-    isDistanceView: boolean;
-    compact?: boolean;
+    allPodiumRate: number;
+    allPlacedRate: number;
+    raceCount: number;
 }) {
-    if (isUmaView) {
-        return <SummaryCard title="Average Score" summary={stats.score} roundAvg hideCount />;
-    }
-    if (isDistanceView) {
-        if (stats.teamScore.count === 0) {
-            return (
-                <Card className={`app-card h-100${compact ? ' overview-score-card' : ''}`}>
-                    <Card.Body>
-                        <SectionHeading title="Average Race Score" compact className="mt-0" />
-                        <div className="text-muted">No data</div>
-                    </Card.Body>
-                </Card>
-            );
-        }
+    return (
+        <KpiCard title="Team Placement">
+            <div className="ring-stat">
+                <TeamPlacementRings allPodiumRate={allPodiumRate} allPlacedRate={allPlacedRate} />
+                <div className="ring-stat-body">
+                    <KpiCount value={Math.round(allPlacedRate * raceCount)} total={raceCount} label="all placed" />
+                    <WinRateLegend
+                        items={[
+                            { label: 'All Podiumed (1st/2nd/3rd)', value: allPodiumRate, color: OUTCOME_COLORS.podium },
+                            { label: 'All Placed (≤5th)', value: allPlacedRate, color: OUTCOME_COLORS.placed },
+                        ]}
+                    />
+                </div>
+            </div>
+        </KpiCard>
+    );
+}
+
+function PlacementCard({
+    placement,
+    counts,
+    raceCount,
+}: {
+    placement: NumericSummary;
+    counts: number[];
+    raceCount: number;
+}) {
+    const bins = useMemo<HistogramBin[]>(() => counts.map((count, index) => ({
+        lo: index + 0.5,
+        hi: index + 1.5,
+        count,
+        tick: String(index + 1),
+        color: PLACE_COLORS[index],
+    })), [counts]);
+
+    if (placement.count === 0) {
         return (
-            <ScoreSummary
-                title="Average Race Score"
-                avg={stats.teamScore.avg}
-                median={stats.teamScore.median}
-                min={stats.teamScore.min}
-                max={stats.teamScore.max}
-                inGameAvg={stats.teamScoreInGame.avg}
-                compact={compact}
-            />
-        );
-    }
-    if (stats.raceScoreTotal.count === 0) {
-        return (
-            <Card className={`app-card h-100${compact ? ' overview-score-card' : ''}`}>
-                <Card.Body>
-                    <SectionHeading title="Average Total Score" compact className="mt-0" />
-                    <div className="text-muted">No data</div>
-                </Card.Body>
-            </Card>
+            <KpiCard title="Average Finishing Position">
+                <div className="empty-note">No data</div>
+            </KpiCard>
         );
     }
     return (
-        <ScoreSummary
-            title="Average Total Score"
-            avg={stats.raceScoreTotal.avg}
-            median={stats.raceScoreTotal.median}
-            min={stats.raceScoreTotal.min}
-            max={stats.raceScoreTotal.max}
-            inGameAvg={stats.raceScoreTotalInGame.avg}
-            compact={compact}
-        />
+        <KpiCard title="Average Finishing Position" className="kpi-score kpi-placement">
+            <div className="kpi-head">
+                <div className="kpi-figure"><AnimatedText text={placement.avg.toFixed(2)} /></div>
+            </div>
+            <Histogram
+                bins={bins}
+                avg={placement.avg}
+                median={placement.median}
+                min={placement.min}
+                max={placement.max}
+                format={formatPosition}
+                minLabel="best"
+                maxLabel="worst"
+                binTip={(bin) => {
+                    const share = raceCount > 0 ? (bin.count / raceCount) * 100 : 0;
+                    return {
+                        head: ordinal(bin.lo + 0.5),
+                        color: bin.color,
+                        rows: [
+                            { label: 'Races', value: bin.count },
+                            { label: 'Share', value: `${share.toFixed(1)}%` },
+                        ],
+                    };
+                }}
+            />
+        </KpiCard>
     );
 }
 
 export default function StatCards({
     stats,
+    scaleTrend = stats.scoreTrend,
     viewMode = 'team',
-    showSessionWinRate = true,
-    showAvgPlacement = true,
-    showTeamScorePerRound = true,
-    showRaceCount = false,
     distanceWinRatesPanel,
 }: {
     stats: AggregatedStats;
+    /** Full-history trend when `stats` is a recent subset; sets the histogram bin width. */
+    scaleTrend?: AggregatedStats['scoreTrend'];
     viewMode?: StatCardViewMode;
-    showSessionWinRate?: boolean;
-    showAvgPlacement?: boolean;
-    showTeamScorePerRound?: boolean;
-    showRaceCount?: boolean;
     distanceWinRatesPanel?: ReactNode;
 }) {
     const isUmaView = viewMode === 'uma';
-    const isDistanceView = viewMode === 'distance';
-    const isTeamView = !isUmaView && !isDistanceView;
-    const isOverviewLayout = isTeamView && showSessionWinRate && !!distanceWinRatesPanel;
-    const isDistanceLayout = isDistanceView;
-    const isUmaOverviewLayout = isUmaView && showRaceCount;
-
-    const primaryWinRate = isUmaView ? stats.winRate : stats.roundWinRate;
-    const primaryTop2 = isUmaView ? stats.top2Rate : stats.roundTop2Rate;
-    const primaryTop3 = isUmaView ? stats.top3Rate : stats.roundTop3Rate;
+    const winRate = isUmaView ? stats.winRate : stats.roundWinRate;
+    const top2 = isUmaView ? stats.top2Rate : stats.roundTop2Rate;
+    const top3 = isUmaView ? stats.top3Rate : stats.roundTop3Rate;
     const raceCount = stats.totalRounds;
-    const raceWins = Math.round(primaryWinRate * raceCount);
+    const raceWins = Math.round(winRate * raceCount);
+    const trendScores = useMemo(() => stats.scoreTrend.map((point) => point.teamScore), [stats.scoreTrend]);
+    const scaleScores = useMemo(() => scaleTrend.map((point) => point.teamScore), [scaleTrend]);
 
-    if (isUmaOverviewLayout) {
+    if (isUmaView) {
         return (
-            <Row className="g-3 performance-overview-row">
-                <Col lg={4}>
-                    <RaceWinRateCard
-                        winRate={primaryWinRate}
-                        top2={primaryTop2}
-                        top3={primaryTop3}
-                        raceCount={raceCount}
-                        raceWins={raceWins}
-                        compact
-                    />
-                </Col>
-                <Col lg={4}>
-                    {stats.score.count === 0 ? (
-                        <Card className="app-card h-100 overview-score-card">
-                            <Card.Body>
-                                <SectionHeading title="Average Score" compact className="mt-0" />
-                                <div className="text-muted">No data</div>
-                            </Card.Body>
-                        </Card>
-                    ) : (
-                        <ScoreSummary
-                            title="Average Score"
-                            avg={stats.score.avg}
-                            median={stats.score.median}
-                            min={stats.score.min}
-                            max={stats.score.max}
-                            compact
-                        />
-                    )}
-                </Col>
-                <Col lg={4}>
-                    <Card className="app-card h-100 overview-score-card">
-                        <Card.Body>
-                            <SectionHeading title="Number of Races" compact className="mt-0" />
-                            <div className="score-summary-layout">
-                                <div className="metric-value"><AnimatedText text={String(stats.totalRounds)} /></div>
-                            </div>
-                        </Card.Body>
-                    </Card>
-                </Col>
-            </Row>
+            <div className="kpi-grid is-uma">
+                <KpiCard title="Race Win Rate">
+                    <RaceRatesBlock winRate={winRate} top2={top2} top3={top3} raceCount={raceCount} raceWins={raceWins} />
+                </KpiCard>
+                <ScoreKpi title="Average Score" summary={stats.score} values={trendScores} unit="races" />
+                <PlacementCard placement={stats.placement} counts={stats.placementCounts} raceCount={raceCount} />
+            </div>
         );
     }
 
-    if (isDistanceLayout) {
+    if (viewMode === 'distance') {
         return (
-            <Row className="g-3 performance-overview-row">
-                <Col lg={4}>
-                    <AverageTotalScoreCard
-                        stats={stats}
-                        isUmaView={isUmaView}
-                        isDistanceView={isDistanceView}
-                        compact
-                    />
-                </Col>
-                <Col lg={4}>
-                    <RaceWinRateCard
-                        winRate={primaryWinRate}
-                        top2={primaryTop2}
-                        top3={primaryTop3}
-                        raceCount={raceCount}
-                        raceWins={raceWins}
-                        compact
-                    />
-                </Col>
-                <Col lg={4}>
-                    <TeamPlacementRateCard
-                        allPodiumRate={stats.roundAllPodiumRate}
-                        allPlacedRate={stats.roundAllPlacedRate}
-                        raceCount={raceCount}
-                        compact
-                    />
-                </Col>
-            </Row>
-        );
-    }
-
-    if (isOverviewLayout) {
-        return (
-            <Row className="g-3 performance-overview-row">
-                <Col lg={5}>
-                    <TeamWinRatesCard
-                        stats={stats}
-                        primaryWinRate={primaryWinRate}
-                        primaryTop2={primaryTop2}
-                        primaryTop3={primaryTop3}
-                        raceCount={raceCount}
-                        raceWins={raceWins}
-                        compact
-                    />
-                </Col>
-                <Col lg={2}>
-                    <AverageTotalScoreCard
-                        stats={stats}
-                        isUmaView={isUmaView}
-                        isDistanceView={isDistanceView}
-                        compact
-                    />
-                </Col>
-                <Col lg={5}>
-                    {distanceWinRatesPanel}
-                </Col>
-            </Row>
+            <div className="kpi-grid is-distance">
+                <ScoreKpi
+                    title="Average Race Score"
+                    summary={stats.teamScore}
+                    inGameAvg={stats.teamScoreInGame.avg}
+                    values={trendScores}
+                    scaleValues={scaleScores}
+                    unit="races"
+                />
+                <KpiCard title="Race Win Rate">
+                    <RaceRatesBlock winRate={winRate} top2={top2} top3={top3} raceCount={raceCount} raceWins={raceWins} />
+                </KpiCard>
+                <TeamPlacementCard
+                    allPodiumRate={stats.roundAllPodiumRate}
+                    allPlacedRate={stats.roundAllPlacedRate}
+                    raceCount={raceCount}
+                />
+            </div>
         );
     }
 
     return (
-        <Row className="g-3">
-            {showSessionWinRate && isTeamView && (
-                <Col md={6} sm={12}>
-                    <TeamWinRatesCard
-                        stats={stats}
-                        primaryWinRate={primaryWinRate}
-                        primaryTop2={primaryTop2}
-                        primaryTop3={primaryTop3}
-                        raceCount={raceCount}
-                        raceWins={raceWins}
-                    />
-                </Col>
-            )}
-
-            {(!showSessionWinRate || !isTeamView) && (
-            <Col md={3} sm={6}>
-                <Card className="app-card h-100">
-                    <Card.Body>
-                        <SectionHeading title={isUmaView ? 'Win Rate' : 'Race Win Rate'} compact className="mt-0" />
-                        <div className="win-rate-card-layout">
-                            <WinRateRings winRate={primaryWinRate} top2Rate={primaryTop2} top3Rate={primaryTop3} />
-                            <div>
-                                {isTeamView && (
-                                    <div className="win-rate-count mb-2">
-                                        <strong><AnimatedText text={`${raceWins}/${raceCount}`} /></strong>
-                                        <span>Races Won</span>
-                                    </div>
-                                )}
-                                <WinRateLegend
-                                    items={[
-                                        { label: 'Win', value: primaryWinRate, color: '#66bb6a' },
-                                        { label: 'Top 2', value: primaryTop2, color: '#ffca28' },
-                                        { label: 'Top 3', value: primaryTop3, color: '#fd7e14' },
-                                    ]}
-                                />
-                            </div>
-                        </div>
-                    </Card.Body>
-                </Card>
-            </Col>
-            )}
-
-            {showSessionWinRate && !isTeamView && (
-                <Col md={3} sm={6}>
-                    <Card className="app-card h-100">
-                        <Card.Body>
-                            <SectionHeading title="Session Win Rate" compact className="mt-0" />
-                            <div className="win-rate-card-layout">
-                                <WinRateDonut value={stats.sessionWinRate} />
-                                <div className="win-rate-count">
-                                    <strong><AnimatedText text={`${stats.playerRoundWins}/${stats.totalRounds}`} /></strong>
-                                    <span>Rounds Won</span>
-                                </div>
-                            </div>
-                        </Card.Body>
-                    </Card>
-                </Col>
-            )}
-
-            {showAvgPlacement && (
-                <Col md={3} sm={6}>
-                    <SummaryCard
-                        title={isUmaView ? 'Average Placement' : 'Avg Placement'}
-                        summary={stats.placement}
-                        hideMin={isUmaView}
-                        hideCount={isUmaView}
-                    />
-                </Col>
-            )}
-
-            {!isOverviewLayout && (
-            <Col md={3} sm={6}>
-                <AverageTotalScoreCard stats={stats} isUmaView={isUmaView} isDistanceView={isDistanceView} />
-            </Col>
-            )}
-
-            {showTeamScorePerRound && (
-                <Col md={3} sm={6}>
-                    <SummaryCard title="Team Score / Round" summary={stats.teamScore} roundAvg />
-                </Col>
-            )}
-
-            {showRaceCount && (
-                <Col md={3} sm={6}>
-                    <Card className="app-card h-100">
-                        <Card.Body>
-                            <SectionHeading level="card" title="Number of Races" />
-                            <div className="metric-value"><AnimatedText text={String(stats.totalRounds)} /></div>
-                        </Card.Body>
-                    </Card>
-                </Col>
-            )}
-
-        </Row>
+        <div className="kpi-grid is-overview">
+            <TeamWinRatesCard
+                stats={stats}
+                winRate={winRate}
+                top2={top2}
+                top3={top3}
+                raceCount={raceCount}
+                raceWins={raceWins}
+            />
+            <ScoreKpi
+                title="Average Total Score"
+                summary={stats.raceScoreTotal}
+                inGameAvg={stats.raceScoreTotalInGame.avg}
+                values={trendScores}
+                scaleValues={scaleScores}
+                unit="trials"
+            />
+            {distanceWinRatesPanel}
+        </div>
     );
 }

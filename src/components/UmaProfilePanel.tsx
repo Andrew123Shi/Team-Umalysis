@@ -1,35 +1,15 @@
-import { Card } from 'react-bootstrap';
-
 import type { AptitudeSet, SkillRef, UmaEntry } from '../analytics/types';
 import { computeTotalSkillPoints } from '../analytics/skillUtils';
-import { STYLE_SATURATION_COLORS } from '../analytics/styleSaturation';
 import AssetLoader from '../data/AssetLoader';
 import * as UMDatabaseUtils from '../data/UMDatabaseUtils';
-import UMDatabaseWrapper from '../data/UMDatabaseWrapper';
 import { getSkillDef } from './RaceReplay/utils/SkillDataUtils';
-import CareerRatingBadge from './CareerRatingBadge';
-import { formatScore } from '../utils/formatScore';
+import { StatStrip, UmaIdentity } from './UmaCardParts';
 import {
     getProfileSkillIconFolder,
     getProfileSkillRarityClass,
+    isMainUniqueSkill,
     sortProfileSkills,
 } from '../utils/profileSkillUtils';
-
-const STYLE_SHORT_LABELS: Record<number, string> = {
-    1: 'Front',
-    2: 'Pace',
-    3: 'Late',
-    4: 'End',
-    5: 'Front',
-};
-
-const PROFILE_STAT_ITEMS = [
-    { key: 'speed' as const, icon: 'speed', alt: 'SPD' },
-    { key: 'stamina' as const, icon: 'stamina', alt: 'STA' },
-    { key: 'pow' as const, icon: 'power', alt: 'POW' },
-    { key: 'guts' as const, icon: 'guts', alt: 'GUT' },
-    { key: 'wiz' as const, icon: 'wit', alt: 'WIZ' },
-] as const;
 
 const TRACK_APTITUDES = [
     { key: 'turf' as const, label: 'Turf' },
@@ -50,20 +30,6 @@ const STYLE_APTITUDES = [
     { key: 'oikomi' as const, label: 'End', runningStyle: 4 },
 ] as const;
 
-function StarDisplay({ count }: { count: number }) {
-    if (count <= 0) return null;
-    const filled = Math.min(count, 5);
-    return (
-        <span className="uma-roster-sm-stars" aria-label={`${filled} stars`}>
-            {Array.from({ length: 5 }, (_, i) => (
-                <span key={i} className={i < filled ? 'uma-roster-sm-star is-filled' : 'uma-roster-sm-star'}>
-                    ★
-                </span>
-            ))}
-        </span>
-    );
-}
-
 function AptGradeBadge({ value }: { value: number }) {
     const label = UMDatabaseUtils.charaProperLabels[value];
     if (!label) return <span className="apt-grade-badge grade-G">—</span>;
@@ -83,10 +49,11 @@ function AptitudeItem({
     value: number;
     active: boolean;
 }) {
+    const isS = UMDatabaseUtils.charaProperLabels[value] === 'S';
     return (
-        <span className={`apt-item${active ? ' is-active' : ''}`}>
-            <span className="apt-key">{label}</span>
+        <span className={`apt-item${active ? ' is-active' : ''}${active && isS ? ' is-s' : ''}`}>
             <AptGradeBadge value={value} />
+            <span className="apt-key">{label}</span>
         </span>
     );
 }
@@ -141,29 +108,6 @@ function AptitudeGrid({
     );
 }
 
-function ProfileStatsBar({
-    stats,
-    totalSkillPoints,
-}: {
-    stats: UmaEntry['stats'];
-    totalSkillPoints: number;
-}) {
-    return (
-        <div className="uma-roster-sm-stats uma-profile-stats-bar">
-            {PROFILE_STAT_ITEMS.map(({ key, icon, alt }) => (
-                <div key={key} className="uma-roster-sm-stat">
-                    <img src={AssetLoader.getStatIcon(icon)} alt={alt} className="uma-roster-sm-stat-icon" />
-                    <span className="uma-roster-sm-stat-value">{stats[key]}</span>
-                </div>
-            ))}
-            <div className="uma-roster-sm-stat">
-                <img src={AssetLoader.getStatIcon('hint')} alt="Skill" className="uma-roster-sm-stat-icon" />
-                <span className="uma-roster-sm-stat-value">{totalSkillPoints}</span>
-            </div>
-        </div>
-    );
-}
-
 function ProfileSkillChip({ skillId, level }: SkillRef) {
     const skill = getSkillDef(skillId);
     const name = skill?.name ?? `Skill ${skillId}`;
@@ -184,7 +128,7 @@ function ProfileSkillChip({ skillId, level }: SkillRef) {
                 </span>
             )}
             <span className="skill-name">{name}</span>
-            <span className="skill-level">Lv{level}</span>
+            {isMainUniqueSkill(skillId) && <span className="skill-level">Lv{level}</span>}
         </span>
     );
 }
@@ -226,65 +170,30 @@ export default function UmaProfilePanel({
     distanceType: number;
     entry: UmaEntry | null;
 }) {
-    const outfitName = UMDatabaseWrapper.cards[cardId]?.name;
-    const styleLabel = entry ? STYLE_SHORT_LABELS[entry.runningStyle] ?? 'Pace' : null;
-    const styleColor = entry
-        ? STYLE_SATURATION_COLORS[entry.runningStyle] ?? STYLE_SATURATION_COLORS[2]
-        : STYLE_SATURATION_COLORS[2];
-    const totalSkillPoints = entry ? computeTotalSkillPoints(entry.skills) : 0;
+    const totalSkillPoints = entry ? computeTotalSkillPoints(entry.skills) : undefined;
 
     return (
-        <Card className="app-card uma-profile-panel uma-roster-member">
-            <Card.Body className="uma-roster-member-body uma-profile-member-body">
-                <div className="uma-roster-sm-header uma-profile-sm-header">
-                    <img
-                        src={AssetLoader.getRacewearIcon(cardId)}
-                        alt=""
-                        className="uma-roster-sm-avatar uma-profile-sm-avatar"
+        <section className="app-card uma-profile-panel">
+            <UmaIdentity
+                cardId={cardId}
+                charaName={charaName}
+                rankScore={rankScore}
+                starCount={entry?.starCount}
+                runningStyle={entry?.runningStyle}
+                badgeSize={56}
+                size="lg"
+            />
+            <StatStrip stats={stats} totalSkillPoints={totalSkillPoints} />
+            {entry && (
+                <>
+                    <AptitudeGrid
+                        aptitudes={entry.aptitudes}
+                        distanceType={distanceType}
+                        runningStyle={entry.runningStyle}
                     />
-                    <div className="uma-roster-sm-info">
-                        <div className="uma-roster-sm-name">
-                            {outfitName && (
-                                <div className="uma-roster-sm-outfit text-truncate">{outfitName}</div>
-                            )}
-                            <div className="uma-roster-sm-chara-line">
-                                <span className="uma-roster-sm-chara text-truncate">{charaName}</span>
-                                {entry && <StarDisplay count={entry.starCount} />}
-                            </div>
-                        </div>
-                        {styleLabel && (
-                            <div className="uma-roster-sm-tags">
-                                <span
-                                    className="uma-roster-sm-tag style"
-                                    style={{
-                                        color: styleColor,
-                                        background: `color-mix(in srgb, ${styleColor} 18%, transparent)`,
-                                    }}
-                                >
-                                    {styleLabel}
-                                </span>
-                            </div>
-                        )}
-                    </div>
-                    <div className="uma-roster-sm-rank-block">
-                        <CareerRatingBadge score={rankScore} size={56} />
-                        <span className="uma-roster-sm-score-value">{formatScore(rankScore)}</span>
-                    </div>
-                </div>
-
-                <ProfileStatsBar stats={stats} totalSkillPoints={totalSkillPoints} />
-
-                {entry && (
-                    <>
-                        <AptitudeGrid
-                            aptitudes={entry.aptitudes}
-                            distanceType={distanceType}
-                            runningStyle={entry.runningStyle}
-                        />
-                        <SkillList skills={entry.skills} />
-                    </>
-                )}
-            </Card.Body>
-        </Card>
+                    <SkillList skills={entry.skills} />
+                </>
+            )}
+        </section>
     );
 }

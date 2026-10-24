@@ -155,25 +155,3 @@ export function getSessionOpponentTrainer(session: {
     }
     return 'Unknown';
 }
-
-export function countRoundWinsByPlacement(
-    starts: { race_horse_data_array?: { team_id?: number; trainer_name?: string }[] }[],
-    results: { chara_result_array?: { team_id?: number; finish_order?: number }[] }[],
-): { roundsWon: number; identity: PlayerIdentity } {
-    const identity = detectPlayerIdentityFromSession(starts);
-    const opponentTeamId = identity.teamId === 1 ? 2 : 1;
-    let roundsWon = 0;
-
-    for (let i = 0; i < results.length; i++) {
-        const charaResults = results[i]?.chara_result_array ?? [];
-        const playerBest = charaResults
-            .filter((c) => Number(c.team_id) === identity.teamId)
-            .reduce((best, c) => Math.min(best, Number(c.finish_order) || 99), 99);
-        const opponentBest = charaResults
-            .filter((c) => Number(c.team_id) === opponentTeamId)
-            .reduce((best, c) => Math.min(best, Number(c.finish_order) || 99), 99);
-        if (playerBest < opponentBest) roundsWon += 1;
-    }
-
-    return { roundsWon, identity };
-}

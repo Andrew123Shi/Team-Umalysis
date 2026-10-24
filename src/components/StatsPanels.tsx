@@ -1,10 +1,9 @@
-import { Button, ButtonGroup, Card, OverlayTrigger, Tooltip } from 'react-bootstrap';
+import { Button, ButtonGroup, OverlayTrigger, Tooltip } from 'react-bootstrap';
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 
 import type { AggregatedStats, TTRound, UmaEntry } from '../analytics/types';
 
-import { COL_HALF, COL_THIRD } from './layout';
 import SectionHeading from './SectionHeading';
 import { useLoadingRemainingFiles } from './RemainingFilesLoadingAlert';
 
@@ -25,6 +24,7 @@ import AverageStatsComparisonChart from './charts/AverageStatsComparisonChart';
 import { WinRatePieCard } from './charts/WinRatePies';
 import UmaProfilePanel from './UmaProfilePanel';
 import { formatScore } from '../utils/formatScore';
+import { AnimatedText } from './AnimatedNumber';
 
 import StyleCompositionChart from './charts/StyleCompositionChart';
 
@@ -90,28 +90,30 @@ export function StatsScopeToggle({
 
 function DistanceWinRatesPanel({ stats }: { stats: AggregatedStats }) {
     return (
-        <Card className="app-card h-100">
-            <Card.Body>
-                <SectionHeading title="Distance Win Rates" compact className="mt-0" />
-                <div className="distance-win-rates-grid">
-                    {stats.distanceWinRates.map((d) => (
-                        <div key={d.distance} className="distance-win-rate-cell">
-                            <WinRatePieCard
-                                title={d.distance}
-                                value={d.winRate}
-                                detail={`${Math.round(d.winRate * d.appearances)}/${d.appearances} wins`}
-                                footer={(
-                                    <>
-                                        <span>Avg. Score</span>
-                                        <strong>{formatScore(d.avgScore)}</strong>
-                                    </>
-                                )}
-                            />
-                        </div>
-                    ))}
-                </div>
-            </Card.Body>
-        </Card>
+        <section className="app-card kpi-card kpi-distances">
+            <SectionHeading title="Distance Win Rates" />
+            <div className="ring-tile-grid">
+                {stats.distanceWinRates.map((d) => (
+                    <WinRatePieCard
+                        key={d.distance}
+                        title={d.distance}
+                        value={d.winRate}
+                        detail={(
+                            <>
+                                <strong><AnimatedText text={String(Math.round(d.winRate * d.appearances))} /></strong>
+                                /<AnimatedText text={String(d.appearances)} />
+                            </>
+                        )}
+                        footer={(
+                            <>
+                                <span>Avg</span>
+                                <strong><AnimatedText text={formatScore(d.avgScore)} /></strong>
+                            </>
+                        )}
+                    />
+                ))}
+            </div>
+        </section>
     );
 }
 
@@ -133,14 +135,7 @@ function AnalyticsSection({
     }
     return (
         <section className="analytics-section">
-            {actions ? (
-                <div className="section-heading-action-row">
-                    <SectionHeading level="section" title={title} subtitle={subtitle} />
-                    {actions}
-                </div>
-            ) : (
-                <SectionHeading level="section" title={title} subtitle={subtitle} />
-            )}
+            <SectionHeading level="section" title={title} subtitle={subtitle} actions={actions} />
             {children}
         </section>
     );
@@ -200,7 +195,6 @@ export default function StatsPanels({
     const isUmaView = viewMode === 'uma';
     const isDistanceView = viewMode === 'distance';
     const isTeamView = viewMode === 'team';
-    const hideMatchupOutfitName = isDistanceView;
     const showSectionHeaders = !isDistanceView;
     const showOverviewPerformanceExtras = showDistanceWinRates && isTeamView;
     const [overviewSectionScopes, setOverviewSectionScopes] = useState<OverviewSectionScopes>(
@@ -237,30 +231,7 @@ export default function StatsPanels({
     ) : overviewActionsFor('summary');
 
     const buildOpponentChart = (chartStats: AggregatedStats) => (
-        <AverageStatsComparisonChart
-            showTeamRating={!isDistanceView}
-            opponent={{
-                stats: {
-                    speed: chartStats.opponentStats.speed.avg,
-                    stamina: chartStats.opponentStats.stamina.avg,
-                    pow: chartStats.opponentStats.pow.avg,
-                    guts: chartStats.opponentStats.guts.avg,
-                    wiz: chartStats.opponentStats.wiz.avg,
-                },
-                rankScore: chartStats.opponentStats.rankScore.avg,
-                teamRating: chartStats.opponentStats.teamRating.avg,
-            }}
-            npc={{
-                stats: {
-                    speed: chartStats.npcStats.speed.avg,
-                    stamina: chartStats.npcStats.stamina.avg,
-                    pow: chartStats.npcStats.pow.avg,
-                    guts: chartStats.npcStats.guts.avg,
-                    wiz: chartStats.npcStats.wiz.avg,
-                },
-                rankScore: chartStats.npcStats.rankScore.avg,
-            }}
-        />
+        <AverageStatsComparisonChart showTeamRating={!isDistanceView} stats={chartStats} />
     );
     const opponentChart = buildOpponentChart(stats);
     const progressionStats = overviewStatsFor('progression');
@@ -286,8 +257,8 @@ export default function StatsPanels({
             >
 
                 {isUmaView && profileUma ? (
-                    <div className="row g-3 align-items-stretch">
-                        <div className="col-lg-5 d-flex flex-column gap-3 uma-profile-column">
+                    <div className="uma-profile-layout">
+                        <div className="uma-profile-column">
                             <UmaProfilePanel
                                 charaName={profileUma.charaName}
                                 cardId={profileUma.cardId}
@@ -297,7 +268,7 @@ export default function StatsPanels({
                                 entry={latestUmaEntry ?? null}
                             />
                             {styleSaturationRounds && styleSaturationBuildKey && (
-                                <>
+                                <div className="layout-grid is-2 is-tight">
                                     <StyleSaturationChart
                                         rounds={styleSaturationRounds}
                                         buildKey={styleSaturationBuildKey}
@@ -306,18 +277,11 @@ export default function StatsPanels({
                                         rounds={styleSaturationRounds}
                                         buildKey={styleSaturationBuildKey}
                                     />
-                                </>
+                                </div>
                             )}
                         </div>
-                        <div className="col-lg-7 d-flex flex-column gap-3 uma-profile-stats-column">
-                            <StatCards
-                                stats={stats}
-                                viewMode="uma"
-                                showSessionWinRate={false}
-                                showAvgPlacement={false}
-                                showTeamScorePerRound={false}
-                                showRaceCount
-                            />
+                        <div className="uma-profile-column">
+                            <StatCards stats={stats} viewMode="uma" />
                             {stats.scoreBreakdown && (
                                 <ScoreBreakdownPanel breakdown={stats.scoreBreakdown} />
                             )}
@@ -326,10 +290,8 @@ export default function StatsPanels({
                 ) : (
                     <StatCards
                         stats={summaryDisplayStats}
+                        scaleTrend={emaSourceTrend ?? stats.scoreTrend}
                         viewMode={viewMode as StatCardViewMode}
-                        showSessionWinRate={viewMode !== 'distance' && !isUmaView}
-                        showAvgPlacement={viewMode === 'uma'}
-                        showTeamScorePerRound={false}
                         distanceWinRatesPanel={showOverviewPerformanceExtras
                             ? <DistanceWinRatesPanel stats={summaryDisplayStats} />
                             : undefined}
@@ -345,19 +307,9 @@ export default function StatsPanels({
                     subtitle="Average stats for opponents and NPCs"
                 >
 
-                    <Card className="app-card">
-
-                        <Card.Body>
-
-                            {!showSectionHeaders && (
-                                <SectionHeading title="Opponent Strength" compact className="mt-0" />
-                            )}
-
-                            {opponentChart}
-
-                        </Card.Body>
-
-                    </Card>
+                    <section className="app-card">
+                        {opponentChart}
+                    </section>
 
                 </AnalyticsSection>
 
@@ -368,94 +320,60 @@ export default function StatsPanels({
                 title="Progression Trends"
                 actions={overviewActionsFor('progression')}
             >
-
-                <Card className="app-card mb-3">
-
-                    <Card.Body>
-
+                <div className="layout-stack">
+                    <section className="app-card">
                         <ScoreTrendChart
                             stats={progressionStats}
                             emaSourceTrend={progressionEmaSource}
                             viewMode={viewMode as StatCardViewMode}
                         />
+                    </section>
 
-                    </Card.Body>
-
-                </Card>
-
-                {!isUmaView && progressionStats.scoreTrend.length > 0 && (
-
-                    <Card className="app-card mb-3">
-
-                        <Card.Body>
-
+                    {progressionStats.scoreTrend.length > 0 && !isUmaView && (
+                        <section className="app-card">
                             <TeamRatingTrendChart
                                 stats={progressionStats}
                                 emaSourceTrend={progressionEmaSource}
                             />
-
-                        </Card.Body>
-
-                    </Card>
-
-                )}
-
-                {progressionStats.scoreTrend.length > 0 && (
-
-                    <Card className="app-card">
-
-                        <Card.Body>
-
+                        </section>
+                    )}
+                    {progressionStats.scoreTrend.length > 0 && (
+                        <section className="app-card">
                             <WinRateTrendChart
                                 stats={progressionStats}
                                 sourceTrend={progressionEmaSource}
                                 showRaceWinRate={isTeamView}
                                 averageSeriesLabel={isUmaView ? 'Average' : undefined}
                             />
-
-                        </Card.Body>
-
-                    </Card>
-
-                )}
+                        </section>
+                    )}
+                </div>
             </AnalyticsSection>
 
             {!isUmaView && (
-
                 <AnalyticsSection
                     showHeader={showSectionHeaders}
                     title="Opponent Characteristics"
                     actions={overviewActionsFor('opponentCharacteristics')}
                 >
-
-                    <div className="row g-3 opponent-characteristics-layout">
-                        <div className={COL_HALF}>
-                            <Card className="app-card h-100 opponent-characteristics-card">
-                                <Card.Body>
-                                    <SectionHeading title="Opponent Style Composition" compact className="mt-0" />
-                                    <StyleCompositionChart
-                                        opponent={opponentCharacteristicsStats.opponentStyleComposition}
-                                        npcPercent={opponentCharacteristicsStats.npcStyleComposition}
-                                        npcAvgCount={opponentCharacteristicsStats.npcStyleCompositionAvgCount}
-                                        roomPercent={opponentCharacteristicsStats.roomStyleComposition}
-                                        roomAvgCount={opponentCharacteristicsStats.roomStyleCompositionAvgCount}
-                                    />
-                                </Card.Body>
-                            </Card>
-                        </div>
-                        <div className={COL_HALF}>
-                            <Card className="app-card h-100 opponent-characteristics-card">
-                                <Card.Body>
-                                    <SectionHeading title="Opponent Strength" compact className="mt-0" />
-                                    <div className="composition-chart-toolbar" aria-hidden="true" />
-                                    {buildOpponentChart(opponentCharacteristicsStats)}
-                                </Card.Body>
-                            </Card>
-                        </div>
+                    <div className="layout-grid is-2 is-wide">
+                        <section className="app-card">
+                            <SectionHeading title="Running Style Composition" />
+                            <StyleCompositionChart
+                                opponent={opponentCharacteristicsStats.opponentStyleComposition}
+                                opponentAvgCount={opponentCharacteristicsStats.opponentStyleCompositionAvgCount}
+                                npcPercent={opponentCharacteristicsStats.npcStyleComposition}
+                                npcAvgCount={opponentCharacteristicsStats.npcStyleCompositionAvgCount}
+                                roomPercent={opponentCharacteristicsStats.roomStyleComposition}
+                                roomAvgCount={opponentCharacteristicsStats.roomStyleCompositionAvgCount}
+                            />
+                        </section>
+                        <section className="app-card">
+                            <SectionHeading title="Average Stats" />
+                            {buildOpponentChart(opponentCharacteristicsStats)}
+                        </section>
                     </div>
-
                 </AnalyticsSection>
-
             )}
 
             <AnalyticsSection
@@ -463,27 +381,12 @@ export default function StatsPanels({
                 title="Skill Analysis"
                 actions={overviewActionsFor('skill')}
             >
-
-                <div className="row g-3">
-
-                    <div className={COL_HALF}>
-
-                        <SkillTable title="Skill Activations" skills={skillStats.playerSkillActivations} mode="player" />
-
-                    </div>
-
+                <div className="layout-grid is-2">
+                    <SkillTable title="Skill Activations" skills={skillStats.playerSkillActivations} mode="player" />
                     {!isUmaView && (
-
-                        <div className={COL_HALF}>
-
-                            <SkillTable title="Most Common Opponent Skills" skills={skillStats.opponentSkills} mode="opponent" />
-
-                        </div>
-
+                        <SkillTable title="Most Common Opponent Skills" skills={skillStats.opponentSkills} mode="opponent" />
                     )}
-
                 </div>
-
             </AnalyticsSection>
 
             <AnalyticsSection
@@ -491,45 +394,21 @@ export default function StatsPanels({
                 title="Racetrack Analysis"
                 actions={overviewActionsFor('racetrack')}
             >
-
-                <div className="row g-3">
-
-                    <div className={COL_HALF}>
-
-                        <MatchupTable
-
-                            entries={racetrackStats.trackMatchups}
-
-                            title="Relative Overperformance"
-
-                            variant="track"
-
-                            defaultSortKey="avgNormalizedScore"
-
-                        />
-
-                    </div>
-
-                    <div className={COL_HALF}>
-
-                        <MatchupTable
-
-                            entries={racetrackStats.trackMatchups}
-
-                            title="Relative Underperformance"
-
-                            variant="track"
-
-                            defaultSortKey="avgNormalizedScore"
-
-                            defaultSortDir="asc"
-
-                        />
-
-                    </div>
-
+                <div className="layout-grid is-2">
+                    <MatchupTable
+                        entries={racetrackStats.trackMatchups}
+                        title="Relative Overperformance"
+                        variant="track"
+                        defaultSortKey="avgNormalizedScore"
+                    />
+                    <MatchupTable
+                        entries={racetrackStats.trackMatchups}
+                        title="Relative Underperformance"
+                        variant="track"
+                        defaultSortKey="avgNormalizedScore"
+                        defaultSortDir="asc"
+                    />
                 </div>
-
             </AnalyticsSection>
 
             <AnalyticsSection
@@ -537,81 +416,33 @@ export default function StatsPanels({
                 title="Uma Analysis"
                 actions={overviewActionsFor('uma')}
             >
-
-                <div className="row g-3">
-
+                <div className={`layout-grid${isUmaView ? ' is-2' : ' is-3'}`}>
                     {!isUmaView && (
-
-                        <div className={COL_THIRD}>
-
-                            <MatchupTable
-
-                                entries={umaStats.matchups}
-
-                                title="Most Common Opponents"
-
-                                defaultSortKey="appearances"
-
-                                defaultSortDir="desc"
-
-                                defaultOccurrenceFilter="all"
-
-                                compactColumns={viewMode === 'distance'}
-
-                                hideOutfitName={hideMatchupOutfitName}
-
-                            />
-
-                        </div>
-
-                    )}
-
-                    <div className={isUmaView ? COL_HALF : COL_THIRD}>
-
                         <MatchupTable
-
                             entries={umaStats.matchups}
-
-                            title="Relative Overperformance"
-
-                            defaultSortKey="winRate"
-
+                            title="Most Common Opponents"
+                            defaultSortKey="appearances"
                             defaultSortDir="desc"
-
-                            compactColumns={viewMode === 'distance'}
-
-                            hideOutfitName={hideMatchupOutfitName}
-
+                            defaultOccurrenceFilter="all"
+                            compactColumns={isDistanceView}
                         />
-
-                    </div>
-
-                    <div className={isUmaView ? COL_HALF : COL_THIRD}>
-
-                        <MatchupTable
-
-                            entries={umaStats.matchups}
-
-                            title="Relative Underperformance"
-
-                            defaultSortKey="winRate"
-
-                            defaultSortDir="asc"
-
-                            compactColumns={viewMode === 'distance'}
-
-                            hideOutfitName={hideMatchupOutfitName}
-
-                        />
-
-                    </div>
-
+                    )}
+                    <MatchupTable
+                        entries={umaStats.matchups}
+                        title="Relative Overperformance"
+                        defaultSortKey="winRate"
+                        defaultSortDir="desc"
+                        compactColumns={isDistanceView}
+                    />
+                    <MatchupTable
+                        entries={umaStats.matchups}
+                        title="Relative Underperformance"
+                        defaultSortKey="winRate"
+                        defaultSortDir="asc"
+                        compactColumns={isDistanceView}
+                    />
                 </div>
-
             </AnalyticsSection>
-
         </>
-
     );
-
 }

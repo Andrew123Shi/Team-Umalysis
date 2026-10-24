@@ -4,8 +4,11 @@ import type { TTSession } from '../analytics/types';
 const DB_NAME = 'team-umalysis';
 const DB_VERSION = 1;
 const HANDLE_STORE = 'directory-handles';
-/** Max concurrent file read+parse tasks on the main thread. */
-const LOAD_CONCURRENCY = 2;
+/**
+ * Max concurrent file read+parse tasks. Parsing is synchronous, so this mostly controls
+ * how many file reads are in flight while the main thread parses.
+ */
+const LOAD_CONCURRENCY = 8;
 /**
  * Newest N files are parsed first so Recent (100) views can render before
  * older sessions finish loading in the background.
@@ -33,7 +36,7 @@ type LoadedSessions = {
     sessions: TTSession[];
 };
 
-type NamedFile = { name: string; file: File };
+type NamedFile = { name: string; handle: FileSystemFileHandle };
 
 /** Run `fn` over `items` with at most `concurrency` tasks in flight. Results keep input order. */
 async function mapPool<T, R>(
@@ -146,7 +149,8 @@ async function parseSessionFiles(
     onProgress?: (loaded: number, total: number) => void,
 ): Promise<TTSession[]> {
     if (files.length === 0) return [];
-    const outcomes = await mapPool(files, LOAD_CONCURRENCY, async ({ name, file }) => {
+    const outcomes = await mapPool(files, LOAD_CONCURRENCY, async ({ name, handle }) => {
+        const file = await handle.getFile();
         const text = await file.text();
         const json = JSON.parse(text);
         const session = parseTeamTrialSession(json, name);
@@ -165,8 +169,7 @@ async function loadSessionsFromHandle(
     const files: NamedFile[] = [];
     for await (const entry of handle.values()) {
         if (entry.kind === 'file' && /^TT-.*\.json$/i.test(entry.name)) {
-            const file = await entry.getFile();
-            files.push({ name: entry.name, file });
+            files.push({ name: entry.name, handle: entry });
         }
     }
     // Newest first (TT-YYYYMMDD_HHMMSS_… names sort chronologically).
@@ -180,6 +183,8 @@ async function loadSessionsFromHandle(
     const progress = { loaded: 0 };
 
     const prioritySessions = await parseSessionFiles(priorityFiles, totalFiles, progress, onProgress);
+    // Paint the final count before the caller's dashboard update blocks the main thread.
+    await waitForPaint();
 
     if (remainingFiles.length > 0) {
         onPriorityReady?.({
@@ -188,12 +193,9 @@ async function loadSessionsFromHandle(
             sessions: prioritySessions,
         });
         // Let React commit + paint the Recent dashboard before older files burn CPU.
-        await new Promise<void>((resolve) => {
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => resolve());
-            });
-        });
+        await waitForPaint();
         const olderSessions = await parseSessionFiles(remainingFiles, totalFiles, progress, onProgress);
+        await waitForPaint();
         return {
             latestFileName,
             sessions: [...prioritySessions, ...olderSessions],
@@ -201,4 +203,12 @@ async function loadSessionsFromHandle(
     }
 
     return { latestFileName, sessions: prioritySessions };
+}
+
+function waitForPaint(): Promise<void> {
+    return new Promise((resolve) => {
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => resolve());
+        });
+    });
 }

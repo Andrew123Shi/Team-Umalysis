@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, Container, Nav, Navbar } from 'react-bootstrap';
+import { Alert } from 'react-bootstrap';
 import { BrowserRouter, Link, NavLink, Route, Routes } from 'react-router-dom';
 import './App.css';
 import './dark-mode.css';
@@ -15,8 +15,25 @@ import ReplayPage from './pages/ReplayPage';
 import SettingsPage from './pages/SettingsPage';
 import { RaceStoreProvider, useRaceProgress, useRaceStore } from './store/RaceStore';
 
+const NAV_ITEMS = [
+    { to: '/', label: 'Overview', end: true },
+    { to: '/uma', label: 'Uma Analysis' },
+    { to: '/distance', label: 'Distance Analysis' },
+    { to: '/replay', label: 'Replay' },
+    { to: '/settings', label: 'Settings' },
+] as const;
+
+function ReloadIcon() {
+    return (
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M13.5 8a5.5 5.5 0 1 1-1.61-3.89" />
+            <path d="M13.5 2.5v3.25h-3.25" />
+        </svg>
+    );
+}
+
 function AppHeader() {
-    const [headerEl, setHeaderEl] = useState<HTMLDivElement | null>(null);
+    const [headerEl, setHeaderEl] = useState<HTMLElement | null>(null);
     const { reload, loading, index } = useRaceStore();
     const { progress } = useRaceProgress();
     useStickyOffset(headerEl, '--sticky-app-header-height');
@@ -33,40 +50,52 @@ function AppHeader() {
     ].filter(Boolean).join(' ');
 
     return (
-        <div ref={setHeaderEl} className="app-fixed-header">
-            <Navbar variant="dark" expand="lg" className="app-nav">
-                <Container fluid>
-                    <Navbar.Brand as={Link} to="/">
-                        <img src={`${baseUrl}icon.ico`} alt="" className="app-brand-mark" aria-hidden="true" />
-                        <span className="app-brand-text">Team Umalysis</span>
-                    </Navbar.Brand>
-                    <Navbar.Toggle aria-controls="nav" />
-                    <Navbar.Collapse id="nav">
-                        <Nav className="me-auto">
-                            <Nav.Link as={NavLink} to="/" end>Overview</Nav.Link>
-                            <Nav.Link as={NavLink} to="/uma">Uma Analysis</Nav.Link>
-                            <Nav.Link as={NavLink} to="/distance">Distance Analysis</Nav.Link>
-                            <Nav.Link as={NavLink} to="/replay">Replay</Nav.Link>
-                            <Nav.Link as={NavLink} to="/settings">Settings</Nav.Link>
-                        </Nav>
-                        <Nav>
-                            <span className="navbar-text app-data-status me-3">
-                                <span className={statusDotClass} aria-hidden="true" />
-                                {displayedFileCount > 0 ? (
-                                    <>
-                                        <strong>{statusFileCount}</strong>
-                                        {` Team Trials file${displayedFileCount === 1 ? '' : 's'} loaded`}
-                                    </>
-                                ) : (
-                                    loading ? 'Loading Team Trials files...' : 'No Team Trials files loaded'
-                                )}
-                            </span>
-                            <Nav.Link onClick={() => reload()} className={loading ? 'disabled' : ''}>Reload Folder</Nav.Link>
-                        </Nav>
-                    </Navbar.Collapse>
-                </Container>
-            </Navbar>
-        </div>
+        <header ref={setHeaderEl} className="app-header">
+            <div className="app-header-inner">
+                <Link to="/" className="app-brand">
+                    <img src={`${baseUrl}icon.ico`} alt="" className="app-brand-mark" aria-hidden="true" />
+                    <span className="app-brand-text">Team Umalysis</span>
+                    <span className="app-brand-badge">v2.0</span>
+                </Link>
+                <nav className="app-nav" aria-label="Primary">
+                    {NAV_ITEMS.map((item) => (
+                        <NavLink
+                            key={item.to}
+                            to={item.to}
+                            end={'end' in item ? item.end : undefined}
+                            className="app-nav-link"
+                        >
+                            {item.label}
+                        </NavLink>
+                    ))}
+                </nav>
+                <div className="app-header-tools">
+                    <span className="app-data-status">
+                        <span className={statusDotClass} aria-hidden="true" />
+                        {displayedFileCount > 0 ? (
+                            <>
+                                <strong>{statusFileCount}</strong>
+                                <span className="app-data-status-label">
+                                    {` file${displayedFileCount === 1 ? '' : 's'}${loading ? ' loading' : ' loaded'}`}
+                                </span>
+                            </>
+                        ) : (
+                            <span className="app-data-status-label">{loading ? 'Loading files…' : 'No files loaded'}</span>
+                        )}
+                    </span>
+                    <button
+                        type="button"
+                        className={`app-icon-btn${loading ? ' is-spinning' : ''}`}
+                        onClick={() => reload()}
+                        disabled={loading}
+                        aria-label="Reload folder"
+                    >
+                        <ReloadIcon />
+                        <span className="app-icon-btn-label">Reload</span>
+                    </button>
+                </div>
+            </div>
+        </header>
     );
 }
 
@@ -76,7 +105,7 @@ function AppRoutes() {
             <Route path="/" element={<DashboardLayout />}>
                 <Route index element={<OverviewPage />} />
                 <Route path="uma" element={<UmaAnalysisPage />} />
-                <Route path="uma/:buildKey" element={<UmaAnalysisPage />} />
+                <Route path="uma/:umaSlug" element={<UmaAnalysisPage />} />
                 <Route path="distance" element={<DistanceAnalysisPage />} />
             </Route>
             <Route path="/replay" element={<ReplayPage />} />
@@ -97,19 +126,24 @@ function BootstrapGate({ children }: { children: React.ReactNode }) {
 
     if (bootError) {
         return (
-            <Container className="py-5">
-                <div className="page-hero">
-                    <div className="page-hero-content">
-                        <div className="page-eyebrow">Boot Error</div>
-                        <h1>Team Umalysis</h1>
-                        <Alert variant="danger" className="mt-3 mb-0">Failed to load game data: {bootError}</Alert>
-                    </div>
+            <div className="app-boot">
+                <div className="app-boot-card">
+                    <div className="app-boot-kicker">Boot error</div>
+                    <h1 className="app-boot-title">Team Umalysis</h1>
+                    <Alert variant="danger" className="mt-3 mb-0">Failed to load game data: {bootError}</Alert>
                 </div>
-            </Container>
+            </div>
         );
     }
     if (!ready) {
-        return null;
+        return (
+            <div className="app-boot" aria-busy="true">
+                <div className="app-boot-loader">
+                    <span className="app-boot-kicker">Loading game data</span>
+                    <span className="app-boot-bar" />
+                </div>
+            </div>
+        );
     }
     return <>{children}</>;
 }
@@ -122,9 +156,9 @@ export default function App() {
                     <div data-bs-theme="dark" className="app-shell">
                         <AppHeader />
                         <main className="app-main">
-                            <Container fluid className="pb-5">
+                            <div className="app-container">
                                 <AppRoutes />
-                            </Container>
+                            </div>
                         </main>
                         <AppFooter />
                     </div>

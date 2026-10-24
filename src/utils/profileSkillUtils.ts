@@ -12,7 +12,8 @@ const SKILL_ICON_FOLDER_BY_ID: Record<number, SkillIconFolder> = {
     20181: 'Green', 40012: 'Green',
     30013: 'Grey', 30023: 'Grey', 30033: 'Grey', 30043: 'Grey',
     10014: 'Purple', 10024: 'Purple', 10034: 'Purple', 10044: 'Purple', 10054: 'Purple',
-    20014: 'Purple', 20024: 'Purple', 20034: 'Purple', 20044: 'Purple', 20064: 'Purple', 20094: 'Purple',
+    20014: 'Purple', 20015: 'Purple', 20024: 'Purple', 20034: 'Purple', 20044: 'Purple', 20064: 'Purple',
+    20094: 'Purple',
     20013: 'Rainbow', 20023: 'Rainbow', 20033: 'Rainbow', 20043: 'Rainbow',
     30011: 'Red', 30012: 'Red', 30021: 'Red', 30022: 'Red', 30031: 'Red', 30032: 'Red',
     30041: 'Red', 30042: 'Red', 30051: 'Red', 30052: 'Red', 30053: 'Red', 30061: 'Red',
@@ -21,8 +22,8 @@ const SKILL_ICON_FOLDER_BY_ID: Record<number, SkillIconFolder> = {
     20053: 'Yellow', 20061: 'Yellow', 20062: 'Yellow', 20063: 'Yellow', 20071: 'Yellow', 20072: 'Yellow',
     20073: 'Yellow', 20081: 'Yellow', 20082: 'Yellow', 20083: 'Yellow', 20091: 'Yellow', 20092: 'Yellow',
     20101: 'Yellow', 20102: 'Yellow', 20121: 'Yellow', 20122: 'Yellow', 20131: 'Yellow', 20132: 'Yellow',
-    20141: 'Yellow', 20142: 'Yellow',
-    20161: 'Yellow', 20171: 'Yellow',
+    20141: 'Yellow', 20142: 'Yellow', 20151: 'Yellow', 20152: 'Yellow',
+    20161: 'Yellow', 20162: 'Yellow', 20171: 'Yellow',
     2010010: 'Yellow',
 };
 
@@ -32,6 +33,12 @@ function isInheritedSkill(skillId: number): boolean {
 
 function hasUniqueFlag(skillId: number, skill: Skill): boolean {
     return skill.rarity === 4 || skill.rarity === 5 || isInheritedSkill(skillId);
+}
+
+/** The uma's own (non-inherited) unique skill. */
+export function isMainUniqueSkill(skillId: number): boolean {
+    const skill = getSkillDef(skillId);
+    return !!skill && (skill.rarity === 4 || skill.rarity === 5) && !isInheritedSkill(skillId);
 }
 
 function getSkillText(skill: Skill): string {

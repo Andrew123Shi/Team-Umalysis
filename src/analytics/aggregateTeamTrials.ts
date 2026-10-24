@@ -35,6 +35,17 @@ import {
 
 type AggregateOptions = { buildKey?: string; distanceType?: number; scoreBonuses?: ScoreBonusSettings };
 
+/** Team Trials races always field 12 runners. */
+const RACE_FIELD_SIZE = 12;
+
+function countPlacements(placements: number[]): number[] {
+    const counts = Array.from({ length: RACE_FIELD_SIZE }, () => 0);
+    placements.forEach((placement) => {
+        if (placement >= 1 && placement <= RACE_FIELD_SIZE) counts[placement - 1] += 1;
+    });
+    return counts;
+}
+
 function summarize(values: number[]): NumericSummary {
     if (values.length === 0) {
         return { count: 0, avg: 0, median: 0, min: 0, max: 0 };
@@ -54,74 +65,52 @@ function summarize(values: number[]): NumericSummary {
     };
 }
 
+const STYLE_COMPOSITION_KEYS = ['runaway', 'front', 'pace', 'late', 'end'] as const;
+
+function emptyStyleComposition(): StyleComposition {
+    return { runaway: 0, front: 0, pace: 0, late: 0, end: 0 };
+}
+
 function styleKey(style: number): keyof StyleComposition {
     switch (style) {
         case 1: return 'front';
         case 2: return 'pace';
         case 3: return 'late';
         case 4: return 'end';
-        case 5: return 'front';
+        case 5: return 'runaway';
         default: return 'front';
     }
 }
 
-function pctStyleComposition(umas: UmaEntry[]): StyleComposition {
-    const comp: StyleComposition = { front: 0, pace: 0, late: 0, end: 0 };
-    if (umas.length === 0) return comp;
-    umas.forEach((u) => { comp[styleKey(u.runningStyle)] += 1; });
-    const n = umas.length;
-    return {
-        front: comp.front / n,
-        pace: comp.pace / n,
-        late: comp.late / n,
-        end: comp.end / n,
-    };
-}
-
-function mergeStyleCompositions(comps: StyleComposition[]): StyleComposition {
-    if (comps.length === 0) {
-        return { front: 0, pace: 0, late: 0, end: 0 };
-    }
-    const sum = comps.reduce((acc, c) => ({
-        front: acc.front + c.front,
-        pace: acc.pace + c.pace,
-        late: acc.late + c.late,
-        end: acc.end + c.end,
-    }), { front: 0, pace: 0, late: 0, end: 0 });
-    const n = comps.length;
-    return {
-        front: sum.front / n,
-        pace: sum.pace / n,
-        late: sum.late / n,
-        end: sum.end / n,
-    };
+function scaleStyleComposition(comp: StyleComposition, factor: number): StyleComposition {
+    const scaled = emptyStyleComposition();
+    STYLE_COMPOSITION_KEYS.forEach((key) => { scaled[key] = comp[key] * factor; });
+    return scaled;
 }
 
 function styleCountComposition(umas: UmaEntry[]): StyleComposition {
-    const comp: StyleComposition = { front: 0, pace: 0, late: 0, end: 0 };
-    if (umas.length === 0) return comp;
+    const comp = emptyStyleComposition();
     umas.forEach((u) => { comp[styleKey(u.runningStyle)] += 1; });
     return comp;
 }
 
-function mergeCountCompositions(comps: StyleComposition[]): StyleComposition {
-    if (comps.length === 0) {
-        return { front: 0, pace: 0, late: 0, end: 0 };
-    }
-    const sum = comps.reduce((acc, c) => ({
-        front: acc.front + c.front,
-        pace: acc.pace + c.pace,
-        late: acc.late + c.late,
-        end: acc.end + c.end,
-    }), { front: 0, pace: 0, late: 0, end: 0 });
-    const n = comps.length;
-    return {
-        front: sum.front / n,
-        pace: sum.pace / n,
-        late: sum.late / n,
-        end: sum.end / n,
-    };
+function pctStyleComposition(umas: UmaEntry[]): StyleComposition {
+    if (umas.length === 0) return emptyStyleComposition();
+    return scaleStyleComposition(styleCountComposition(umas), 1 / umas.length);
 }
+
+/** Per-key mean across compositions (shares or counts). */
+function meanStyleComposition(comps: StyleComposition[]): StyleComposition {
+    if (comps.length === 0) return emptyStyleComposition();
+    const sum = emptyStyleComposition();
+    comps.forEach((comp) => {
+        STYLE_COMPOSITION_KEYS.forEach((key) => { sum[key] += comp[key]; });
+    });
+    return scaleStyleComposition(sum, 1 / comps.length);
+}
+
+const mergeStyleCompositions = meanStyleComposition;
+const mergeCountCompositions = meanStyleComposition;
 
 function statSummary(umas: UmaEntry[], teamRatings: number[] = []): OpponentStatSummary {
     return {
@@ -367,9 +356,8 @@ function buildTrackMatchups(
 }
 
 function styleCompositionKey(umas: UmaEntry[]): string {
-    const counts = { front: 0, pace: 0, late: 0, end: 0 };
-    umas.forEach((u) => { counts[styleKey(u.runningStyle)] += 1; });
-    return `F${counts.front}-P${counts.pace}-L${counts.late}-E${counts.end}`;
+    const counts = styleCountComposition(umas);
+    return `R${counts.runaway}-F${counts.front}-P${counts.pace}-L${counts.late}-E${counts.end}`;
 }
 
 function buildStyleMatchups(rounds: TTRound[]): StyleMatchupEntry[] {
@@ -377,13 +365,7 @@ function buildStyleMatchups(rounds: TTRound[]): StyleMatchupEntry[] {
 
     rounds.forEach((round) => {
         const key = styleCompositionKey(round.opponentUmas);
-        const comp = pctStyleComposition(round.opponentUmas);
-        const scaled = {
-            front: comp.front * 3,
-            pace: comp.pace * 3,
-            late: comp.late * 3,
-            end: comp.end * 3,
-        };
+        const scaled = scaleStyleComposition(pctStyleComposition(round.opponentUmas), 3);
         const entry = map.get(key) ?? { composition: scaled, placements: [], wins: [] };
         round.playerUmas.forEach((p) => {
             entry.placements.push(p.finishOrder);
@@ -397,7 +379,7 @@ function buildStyleMatchups(rounds: TTRound[]): StyleMatchupEntry[] {
         .map(([key, e]) => {
             const appearances = e.placements.length;
             const wins = e.wins.reduce((a, b) => a + b, 0);
-            const label = `F${Math.round(e.composition.front)} P${Math.round(e.composition.pace)} L${Math.round(e.composition.late)} E${Math.round(e.composition.end)}`;
+            const label = `R${Math.round(e.composition.runaway)} F${Math.round(e.composition.front)} P${Math.round(e.composition.pace)} L${Math.round(e.composition.late)} E${Math.round(e.composition.end)}`;
             return {
                 key,
                 label,
@@ -605,6 +587,7 @@ export function aggregateStats(
     const npcComps = rounds.map((r) => pctStyleComposition(r.npcUmas));
     const roomComps = rounds.map((r) => pctStyleComposition([...r.opponentUmas, ...r.npcUmas]));
 
+    const opponentCountComps = rounds.map((r) => styleCountComposition(r.opponentUmas));
     const npcCountComps = rounds.map((r) => styleCountComposition(r.npcUmas));
     const roomCountComps = rounds.map((r) => styleCountComposition([...r.opponentUmas, ...r.npcUmas]));
 
@@ -709,6 +692,7 @@ export function aggregateStats(
         scoreBonuses: bonuses,
         sessionWinRate: filteredSessions.length > 0 ? sessionWins / filteredSessions.length : 0,
         placement: summarize(placements),
+        placementCounts: countPlacements(placements),
         score: summarize(scores),
         raceScoreTotal: summarize(sessionScoreTotals),
         raceScoreTotalInGame: summarize(inGameSessionScoreTotals),
@@ -725,6 +709,7 @@ export function aggregateStats(
         opponentStyleComposition: mergeStyleCompositions(opponentComps),
         npcStyleComposition: mergeStyleCompositions(npcComps),
         roomStyleComposition: mergeStyleCompositions(roomComps),
+        opponentStyleCompositionAvgCount: mergeCountCompositions(opponentCountComps),
         npcStyleCompositionAvgCount: mergeCountCompositions(npcCountComps),
         roomStyleCompositionAvgCount: mergeCountCompositions(roomCountComps),
         opponentStats: statSummary(opponentEntries, rounds.map((r) => r.opponentEvaluate)),
@@ -843,17 +828,14 @@ export function aggregateByDistance(sessions: TTSession[], distanceType: number,
     return aggregateStats(sessions, { distanceType, scoreBonuses });
 }
 
-export function listPlayerUmas(sessions: TTSession[], scoreBonuses?: ScoreBonusSettings): PlayerUmaSummary[] {
-    return aggregateOverall(sessions, scoreBonuses).playerUmas;
-}
-
-/** Current team roster as 5 distance columns × up to 3 slot rows (Ace first by teamMemberId). */
-export function getTeamRosterGrid(sessions: TTSession[], scoreBonuses?: ScoreBonusSettings): (RosterUmaSlot | null)[][] {
+/**
+ * Current team roster as 5 distance columns × up to 3 slot rows (Ace first by teamMemberId).
+ * `playerUmas` is the Overall aggregate's list, which carries each uma's stats.
+ */
+export function getTeamRosterGrid(sessions: TTSession[], playerUmas: PlayerUmaSummary[]): (RosterUmaSlot | null)[][] {
     if (sessions.length === 0) return [];
 
-    const statsByBuildKey = new Map(
-        aggregateOverall(sessions, scoreBonuses).playerUmas.map((u) => [u.buildKey, u]),
-    );
+    const statsByBuildKey = new Map(playerUmas.map((u) => [u.buildKey, u]));
 
     const latestSession = [...sessions]
         .filter((s) => s.savedAt)

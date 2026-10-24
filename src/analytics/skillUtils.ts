@@ -14,10 +14,6 @@ export function isGoldSkill(skillId: number): boolean {
     return getSkillRarityCategory(skillId) === 'gold';
 }
 
-export function isUniqueSkill(skillId: number): boolean {
-    return getSkillRarityCategory(skillId) === 'unique';
-}
-
 function skillPointCost(skillId: number): number {
     const base = UMDatabaseWrapper.skillNeedPoints[skillId] ?? 0;
     let upgrade = 0;

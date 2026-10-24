@@ -1,5 +1,3 @@
-import type { RaceSimulateData } from '../data/race_data_pb';
-
 export const DISTANCE_LABELS: Record<number, string> = {
     1: 'Sprint',
     2: 'Mile',
@@ -109,7 +107,7 @@ export type UmaEntry = {
 export type ParsedRaceView = {
     label: string;
     raceHorseInfo: any[];
-    raceData: RaceSimulateData;
+    /** Base64 race scenario; decode with deserializeFromBase64 only when a replay needs it. */
     raceScenario: string;
     detectedCourseId?: number;
     horseActVersion?: string;
@@ -181,6 +179,7 @@ export type ScoreBonusBreakdown = Record<ScoreBonusKey, number>;
 export type ScoreBonusSettings = Record<ScoreBonusKey, boolean>;
 
 export type StyleComposition = {
+    runaway: number;
     front: number;
     pace: number;
     late: number;
@@ -290,6 +289,8 @@ export type AggregatedStats = {
     scoreBonuses: ScoreBonusSettings;
     sessionWinRate: number;
     placement: NumericSummary;
+    /** Finishing-position counts; index 0 is 1st place. */
+    placementCounts: number[];
     score: NumericSummary;
     /** Session totals (races + victory bonus) using the score bonus settings. */
     raceScoreTotal: NumericSummary;
@@ -310,6 +311,7 @@ export type AggregatedStats = {
     opponentStyleComposition: StyleComposition;
     npcStyleComposition: StyleComposition;
     roomStyleComposition: StyleComposition;
+    opponentStyleCompositionAvgCount: StyleComposition;
     npcStyleCompositionAvgCount: StyleComposition;
     roomStyleCompositionAvgCount: StyleComposition;
     opponentStats: OpponentStatSummary;

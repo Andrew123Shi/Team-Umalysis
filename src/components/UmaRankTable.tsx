@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { CSSProperties } from 'react';
 import AssetLoader from '../data/AssetLoader';
 import type { UmaComparisonEntry } from '../analytics/types';
 import { formatScore } from '../utils/formatScore';
 import { fallbackAccentColor, useImageAccentColors } from '../hooks/useImageAccentColors';
 import { getUmaImageColorByCardId } from '../utils/umaImageColors';
-import { AnimatedText } from './AnimatedNumber';
-import SectionHeading from './SectionHeading';
+import BarTable, { type BarColumn, type BarRow, type SortDir } from './charts/BarTable';
 
 export type UmaRankRow = {
     entry: UmaComparisonEntry;
@@ -16,11 +14,12 @@ export type UmaRankRow = {
     valueSort: number;
 };
 
-type SortKey = 'charaName' | 'count' | 'value';
-type SortDir = 'asc' | 'desc';
+type ValueKey = 'count' | 'value';
+type SortKey = 'charaName' | ValueKey;
 
 type UmaRankTableProps = {
     title: string;
+    info?: string;
     rows: UmaRankRow[];
     valueColumnLabel: string;
     defaultSortKey?: SortKey;
@@ -28,32 +27,6 @@ type UmaRankTableProps = {
     collapsible?: boolean;
     onSelectUma?: (buildKey: string) => void;
 };
-
-function SortButton({
-    label,
-    sortKey,
-    activeKey,
-    sortDir,
-    onSort,
-}: {
-    label: string;
-    sortKey: SortKey;
-    activeKey: SortKey;
-    sortDir: SortDir;
-    onSort: (key: SortKey) => void;
-}) {
-    const active = activeKey === sortKey;
-    const arrow = active ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '';
-    return (
-        <button
-            type="button"
-            onClick={() => onSort(sortKey)}
-            className={`bar-sort-button${active ? ' is-active' : ''}`}
-        >
-            {label}{arrow}
-        </button>
-    );
-}
 
 function sortRows(rows: UmaRankRow[], sortKey: SortKey, sortDir: SortDir): UmaRankRow[] {
     const dir = sortDir === 'asc' ? 1 : -1;
@@ -70,6 +43,7 @@ function sortRows(rows: UmaRankRow[], sortKey: SortKey, sortDir: SortDir): UmaRa
 
 export default function UmaRankTable({
     title,
+    info,
     rows,
     valueColumnLabel,
     defaultSortKey = 'value',
@@ -106,78 +80,42 @@ export default function UmaRankTable({
         [visible],
     );
     const accentColors = useImageAccentColors(colorSources);
-    const maxBarValue = Math.max(
-        1,
-        ...visible.map((row) => {
-            if (sortKey === 'count') return Math.max(0, row.countSort);
-            if (sortKey === 'value') return Math.max(0, row.valueSort);
-            return Math.max(0, row.valueSort);
-        }),
-    );
-    const barValue = (row: UmaRankRow) => {
-        if (sortKey === 'count') return Math.max(0, row.countSort);
-        if (sortKey === 'value') return Math.max(0, row.valueSort);
-        return Math.max(0, row.valueSort);
-    };
+    const barValue = (row: UmaRankRow) => Math.max(0, sortKey === 'count' ? row.countSort : row.valueSort);
+    const maxBarValue = Math.max(1, ...visible.map(barValue));
+
+    const columns = useMemo<BarColumn<ValueKey>[]>(() => [
+        { key: 'count', label: 'Count' },
+        { key: 'value', label: valueColumnLabel },
+    ], [valueColumnLabel]);
+
+    const barRows: BarRow<ValueKey>[] = visible.map((row) => {
+        const { entry } = row;
+        return {
+            key: entry.buildKey,
+            label: entry.charaName,
+            iconSrc: AssetLoader.getRacewearIcon(entry.cardId),
+            iconClassName: 'is-uma',
+            values: { count: row.countLabel, value: row.valueLabel },
+            barPct: (barValue(row) / maxBarValue) * 100,
+            barColor: getUmaImageColorByCardId(entry.cardId)
+                ?? accentColors[entry.buildKey]
+                ?? fallbackAccentColor(entry.cardId),
+            onClick: onSelectUma ? () => onSelectUma(entry.buildKey) : undefined,
+        };
+    });
 
     return (
-        <div className="uma-rank-table app-card p-3 mb-4">
-            <div className="bar-table-toolbar">
-                <SectionHeading title={title} compact />
-                <div className="bar-sort-controls">
-                    <SortButton label="Uma" sortKey="charaName" activeKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                    <SortButton label="Count" sortKey="count" activeKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                    <SortButton label={valueColumnLabel} sortKey="value" activeKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                </div>
-            </div>
-            <div className="bar-list bar-list-scroll">
-                {visible.length === 0 && <div className="bar-empty">No data</div>}
-                {visible.map((row) => {
-                    const { entry, countLabel, valueLabel } = row;
-                    const width = Math.max(4, Math.min(100, (barValue(row) / maxBarValue) * 100));
-                    const barColor = getUmaImageColorByCardId(entry.cardId)
-                        ?? accentColors[entry.buildKey]
-                        ?? fallbackAccentColor(entry.cardId);
-                    const rowContent = (
-                        <>
-                            <span
-                                className="bar-row-fill"
-                                style={{ '--bar-width': `${width}%`, '--bar-color': barColor } as CSSProperties}
-                            />
-                            <span className="bar-row-content">
-                                <span className="bar-row-label">
-                                    <img
-                                        src={AssetLoader.getRacewearIcon(entry.cardId)}
-                                        alt=""
-                                        className="bar-row-icon uma-rank-icon"
-                                    />
-                                    <span className="bar-row-label-text">{entry.charaName}</span>
-                                </span>
-                                <span className="bar-row-values">
-                                    <span className={`bar-chip${sortKey === 'count' ? ' is-active' : ''}`}><AnimatedText text={countLabel} /></span>
-                                    <span className={`bar-chip${sortKey === 'value' ? ' is-active' : ''}`}><AnimatedText text={valueLabel} /></span>
-                                </span>
-                            </span>
-                        </>
-                    );
-
-                    return onSelectUma ? (
-                        <button
-                            key={entry.buildKey}
-                            type="button"
-                            className="bar-row is-clickable"
-                            onClick={() => onSelectUma(entry.buildKey)}
-                        >
-                            {rowContent}
-                        </button>
-                    ) : (
-                        <div key={entry.buildKey} className="bar-row">
-                            {rowContent}
-                        </div>
-                    );
-                })}
-            </div>
-        </div>
+        <BarTable
+            title={title}
+            info={info}
+            className="uma-rank-table"
+            nameColumn={{ key: 'charaName', label: 'Uma' }}
+            columns={columns}
+            rows={barRows}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onSort={handleSort}
+        />
     );
 }
 
@@ -188,7 +126,7 @@ export function fmtPct(value: number) {
 export function fmtWinRateRow(entry: UmaComparisonEntry): UmaRankRow {
     return {
         entry,
-        countLabel: `${entry.wins} / ${entry.appearances}`,
+        countLabel: `${entry.wins}/${entry.appearances}`,
         valueLabel: fmtPct(entry.winRate),
         countSort: entry.wins,
         valueSort: entry.winRate,
@@ -198,7 +136,7 @@ export function fmtWinRateRow(entry: UmaComparisonEntry): UmaRankRow {
 export function fmtNormScoreRow(entry: UmaComparisonEntry): UmaRankRow {
     return {
         entry,
-        countLabel: `${entry.appearances} / ${entry.appearances}`,
+        countLabel: `${entry.appearances}/${entry.appearances}`,
         valueLabel: formatScore(entry.avgNormalizedScore),
         countSort: entry.appearances,
         valueSort: entry.avgNormalizedScore,
@@ -209,7 +147,7 @@ export function fmtWinMarginRow(entry: UmaComparisonEntry): UmaRankRow {
     const { scoreBreakdown: b } = entry;
     return {
         entry,
-        countLabel: `${b.winMarginWinCount} / ${b.raceCount}`,
+        countLabel: `${b.winMarginWinCount}/${b.raceCount}`,
         valueLabel: b.winMarginLengthCount > 0 ? `${b.avgWinMarginLengths.toFixed(2)} L` : '—',
         countSort: b.winMarginWinCount,
         valueSort: b.avgWinMarginLengths,
@@ -223,7 +161,7 @@ export function fmtRateRow(
     const count = Math.round(rate * entry.scoreBreakdown.raceCount);
     return {
         entry,
-        countLabel: `${count} / ${entry.scoreBreakdown.raceCount}`,
+        countLabel: `${count}/${entry.scoreBreakdown.raceCount}`,
         valueLabel: fmtPct(rate),
         countSort: count,
         valueSort: rate,
@@ -238,7 +176,7 @@ export function fmtAvgActivationRow(
 ): UmaRankRow {
     return {
         entry,
-        countLabel: `${totalActivations} / ${totalChances}`,
+        countLabel: `${totalActivations}/${totalChances}`,
         valueLabel: avgPerRace.toFixed(2),
         countSort: totalActivations,
         valueSort: avgPerRace,

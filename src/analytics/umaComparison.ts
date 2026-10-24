@@ -204,7 +204,3 @@ export function listHistoricalUmas(sessions: TTSession[], scoreBonuses?: ScoreBo
             return (b.lastSeenAt ?? 0) - (a.lastSeenAt ?? 0);
         });
 }
-
-export function countFromRate(rate: number, total: number): number {
-    return Math.round(rate * total);
-}

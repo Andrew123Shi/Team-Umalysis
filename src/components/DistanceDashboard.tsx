@@ -1,6 +1,7 @@
-import { memo, startTransition, useCallback, useEffect, useRef, useState } from 'react';
-import { Col, Row } from 'react-bootstrap';
+import { memo, startTransition, useEffect, useState } from 'react';
 import { DISTANCE_LABELS, DISTANCE_ORDER, type AggregatedStats } from '../analytics/types';
+import { useStickyOffset } from '../hooks/useStickyOffset';
+import { MOTION_MS } from './motion';
 import DistanceJumpNav from './DistanceJumpNav';
 import { useLoadingRemainingFiles } from './RemainingFilesLoadingAlert';
 import SectionHeading from './SectionHeading';
@@ -30,7 +31,6 @@ const DistanceSection = memo(function DistanceSection({
         <section
             id={`distance-${distanceType}`}
             className="distance-section analytics-section"
-            style={{ scrollMarginTop: 'var(--sticky-subnav-offset)' }}
         >
             <SectionHeading level="section" title={DISTANCE_LABELS[distanceType]} />
             <StatsPanels
@@ -48,21 +48,33 @@ export default function DistanceDashboard({ distanceStats, recentDistanceStats }
     const [scope, setScope] = useState<StatsScope>('recent');
     const [activeDistance, setActiveDistance] = useState<number>(DISTANCE_ORDER[0]);
     const [displayedScopes, setDisplayedScopes] = useState<DistanceScopeState>(() => buildScopeState('recent'));
-    const backgroundUpdateTimersRef = useRef<number[]>([]);
-
-    const clearBackgroundUpdates = useCallback(() => {
-        backgroundUpdateTimersRef.current.forEach((timer) => window.clearTimeout(timer));
-        backgroundUpdateTimersRef.current = [];
-    }, []);
-
-    useEffect(() => clearBackgroundUpdates, [clearBackgroundUpdates]);
+    const [subnavEl, setSubnavEl] = useState<HTMLDivElement | null>(null);
+    useStickyOffset(subnavEl, '--sticky-subnav-height', true);
+    /** Off-screen sections still to switch, and to which scope (a new object per switch). */
+    const [backgroundUpdate, setBackgroundUpdate] = useState<{ scope: StatsScope; distances: number[] } | null>(null);
 
     useEffect(() => {
         if (!loadingRemaining || scope === 'recent') return;
-        clearBackgroundUpdates();
+        setBackgroundUpdate(null);
         setScope('recent');
         setDisplayedScopes(buildScopeState('recent'));
-    }, [clearBackgroundUpdates, loadingRemaining, scope]);
+    }, [loadingRemaining, scope]);
+
+    // Runs after the visible sections' switch has committed. Off-screen sections then
+    // update one by one once its animations are over, so their renders never stall them.
+    useEffect(() => {
+        if (!backgroundUpdate) return undefined;
+        const timers = backgroundUpdate.distances
+            .map((distanceType, index) => window.setTimeout(() => {
+                startTransition(() => {
+                    setDisplayedScopes((current) => {
+                        if (current[distanceType] === backgroundUpdate.scope) return current;
+                        return { ...current, [distanceType]: backgroundUpdate.scope };
+                    });
+                });
+            }, MOTION_MS + 150 + 200 * index));
+        return () => timers.forEach((timer) => window.clearTimeout(timer));
+    }, [backgroundUpdate]);
 
     useEffect(() => {
         setDisplayedScopes((current) => {
@@ -75,59 +87,47 @@ export default function DistanceDashboard({ distanceStats, recentDistanceStats }
         if (nextScope === scope) return;
         if (nextScope === 'overall' && loadingRemaining) return;
 
+        // Everything on screen switches together; the rest follows in the background.
+        const onScreen = DISTANCE_ORDER.filter((distanceType) => {
+            if (distanceType === activeDistance) return true;
+            const rect = document.getElementById(`distance-${distanceType}`)?.getBoundingClientRect();
+            return rect !== undefined && rect.bottom > 0 && rect.top < window.innerHeight;
+        });
         setScope(nextScope);
-        clearBackgroundUpdates();
-
         setDisplayedScopes((current) => ({
             ...current,
-            [activeDistance]: nextScope,
+            ...Object.fromEntries(onScreen.map((distanceType) => [distanceType, nextScope])),
         }));
-
-        DISTANCE_ORDER
-            .filter((distanceType) => distanceType !== activeDistance)
-            .forEach((distanceType, index) => {
-                const timer = window.setTimeout(() => {
-                    startTransition(() => {
-                        setDisplayedScopes((current) => {
-                            if (current[distanceType] === nextScope) return current;
-                            return { ...current, [distanceType]: nextScope };
-                        });
-                    });
-                }, 140 * (index + 1));
-                backgroundUpdateTimersRef.current.push(timer);
-            });
+        setBackgroundUpdate({
+            scope: nextScope,
+            distances: DISTANCE_ORDER.filter((distanceType) => !onScreen.includes(distanceType)),
+        });
     };
 
     return (
-        <Row>
-            <Col lg={2} className="mb-3">
-                <div className="distance-sidebar">
-                    <DistanceJumpNav onActiveDistanceChange={setActiveDistance} />
-                    <div className="distance-scope-control">
-                        <StatsScopeToggle value={scope} onChange={changeScope} />
-                    </div>
-                </div>
-            </Col>
-            <Col lg={10}>
-                {DISTANCE_ORDER.map((distanceType) => {
-                    const displayedScope = displayedScopes[distanceType] ?? scope;
-                    const fullStats = distanceStats.get(distanceType);
-                    const stats = displayedScope === 'recent'
-                        ? (recentDistanceStats.get(distanceType) ?? fullStats)
-                        : fullStats;
-                    if (!stats) return null;
-                    return (
-                        <DistanceSection
-                            key={distanceType}
-                            distanceType={distanceType}
-                            stats={stats}
-                            emaSourceTrend={
-                                displayedScope === 'recent' ? fullStats?.scoreTrend : undefined
-                            }
-                        />
-                    );
-                })}
-            </Col>
-        </Row>
+        <div className="distance-dashboard">
+            <div className="distance-subnav" ref={setSubnavEl}>
+                <DistanceJumpNav onActiveDistanceChange={setActiveDistance} />
+                <StatsScopeToggle value={scope} onChange={changeScope} />
+            </div>
+            {DISTANCE_ORDER.map((distanceType) => {
+                const displayedScope = displayedScopes[distanceType] ?? scope;
+                const fullStats = distanceStats.get(distanceType);
+                const stats = displayedScope === 'recent'
+                    ? (recentDistanceStats.get(distanceType) ?? fullStats)
+                    : fullStats;
+                if (!stats) return null;
+                return (
+                    <DistanceSection
+                        key={distanceType}
+                        distanceType={distanceType}
+                        stats={stats}
+                        emaSourceTrend={
+                            displayedScope === 'recent' ? fullStats?.scoreTrend : undefined
+                        }
+                    />
+                );
+            })}
+        </div>
     );
 }

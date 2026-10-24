@@ -1,18 +1,32 @@
-import { useEffect, useMemo, useState } from 'react';
-import ReactECharts from 'echarts-for-react';
-import { Form } from 'react-bootstrap';
-import type { AggregatedStats, RosterUpdate } from '../../analytics/types';
+import { memo, useEffect, useId, useMemo, useState } from 'react';
+import EChart from './EChart';
+import type { AggregatedStats } from '../../analytics/types';
 import { collectAllAxisValues, collectVisibleAxisValues, isLegendSeriesVisible, type LegendSelectChangedEvent } from './chartLegendScale';
-import { rollingAverageForVisibleWindow } from '../../utils/rollingAverage';
-import { segmentAverage } from '../../utils/segmentAverage';
-import { formatUmaDisplayName } from '../../utils/umaDisplayName';
-import { formatRatingHtml } from '../RatingDisplay';
+import { rollingAverage, rollingAverageForVisibleWindow } from '../../utils/rollingAverage';
 import { chartTooltipStyle } from './chartTooltip';
 import { CHART_UPDATE_ANIMATION } from './chartLayout';
+import {
+    CHART_COLORS,
+    CHART_SPLIT_LINE,
+    CHART_TEXT_STYLE,
+    chartLegend,
+    useChartScale,
+} from './chartTheme';
+import {
+    buildRosterMarkerSeries,
+    buildTrendTooltipFormatter,
+    formatChartDate,
+    indexedPoints,
+    sliceTrendWindow,
+    trendGridInsets,
+    trendIndexAxis,
+    trendValueAxis,
+    TrendNumberInput,
+    useTrendWindow,
+    windowedSegmentAverage,
+} from './trendChartShared';
 import SectionHeading from '../SectionHeading';
 
-const GRID_LEFT = 82;
-const GRID_RIGHT = 72;
 const TRIAL_WIN_RATE_LABEL = 'Overall Win Rate';
 const RACE_WIN_RATE_LABEL = 'Race Win Rate';
 const WIN_RATE_LABEL = 'Win Rate';
@@ -23,6 +37,10 @@ const Y_SCALE_WARMUP_POINTS = 10;
 
 function formatWinRatePercent(value: number): string {
     return `${(value * 100).toFixed(1)}%`;
+}
+
+function formatWinRateTick(value: number): string {
+    return `${parseFloat((value * 100).toFixed(1))}%`;
 }
 
 function snapWinRateYRange(values: number[]): { min: number; max: number } {
@@ -58,104 +76,11 @@ function collectWinRateScaleValues(
     return values;
 }
 
-function formatChartDate(isoDate: string): string {
-    const [year, month, day] = isoDate.split('-');
-    if (!year || !month || !day) return isoDate;
-    return `${month}/${day}/${year}`;
-}
-
-function formatRosterUmaLine(uma: { charaName: string; cardId: number; rankScore: number }, sign: '-' | '+'): string {
-    const name = formatUmaDisplayName(uma.charaName, uma.cardId);
-    const text = `${sign} ${name} · ${formatRatingHtml(uma.rankScore)}`;
-    const color = sign === '-' ? '#ea868f' : '#75b798';
-    return `<span style="color:${color}">${text}</span>`;
-}
-
-function formatRosterUpdateHtml(update: RosterUpdate): string {
-    const lines = ['<b>Roster Updated:</b>'];
-    update.removed.forEach((uma) => lines.push(formatRosterUmaLine(uma, '-')));
-    update.added.forEach((uma) => lines.push(formatRosterUmaLine(uma, '+')));
-    return lines.join('<br/>');
-}
-
 function lookbackSeriesLabel(base: string, windowSize: number): string {
     return `${base} (Last ${Math.max(1, Math.floor(windowSize))})`;
 }
 
-function buildTooltipFormatter(scoreTrend: AggregatedStats['scoreTrend']) {
-    return (params: unknown) => {
-        const items = (Array.isArray(params) ? params : [params]) as {
-            axisValue?: string;
-            seriesName?: string;
-            marker?: string;
-            value?: number | null;
-            dataIndex?: number;
-        }[];
-        if (items.length === 0) return '';
-        const header = items[0].axisValue ?? '';
-        const dataIndex = items[0].dataIndex;
-        const lines = items.map((item) => {
-            const val = item.value;
-            if (val == null || !Number.isFinite(val)) return '';
-            return `${item.marker ?? ''}${item.seriesName ?? ''}: ${formatWinRatePercent(val)}`;
-        }).filter(Boolean);
-        const trendPoint = dataIndex != null ? scoreTrend[dataIndex] : undefined;
-        const rosterUpdate = trendPoint?.rosterUpdate;
-        const parts = [`<b>${header}</b>`, ...lines.map((line) => `<b>${line}</b>`)];
-        if (rosterUpdate) {
-            parts.push('');
-            parts.push(formatRosterUpdateHtml(rosterUpdate));
-        }
-        return parts.join('<br/>');
-    };
-}
-
-function buildRosterMarkLine(
-    markLines: { xAxis: number }[],
-    scoreTrend: AggregatedStats['scoreTrend'],
-) {
-    if (markLines.length === 0) return undefined;
-    return {
-        symbol: 'none',
-        silent: false,
-        label: { show: false },
-        lineStyle: { color: 'rgba(234, 134, 143, 0.45)', width: 1, type: 'dashed' as const },
-        emphasis: { lineStyle: { width: 1.5, color: 'rgba(234, 134, 143, 0.7)' } },
-        tooltip: {
-            ...chartTooltipStyle,
-            show: true,
-            formatter: (params: { data?: { xAxis?: number } }) => {
-                const dataIndex = params.data?.xAxis;
-                const update = dataIndex != null ? scoreTrend[dataIndex]?.rosterUpdate : undefined;
-                if (!update) return '';
-                return formatRosterUpdateHtml(update);
-            },
-        },
-        data: markLines,
-    };
-}
-
-function buildRosterMarkerSeries(
-    rosterMarkLine: ReturnType<typeof buildRosterMarkLine>,
-    pointCount: number,
-) {
-    if (!rosterMarkLine) return null;
-    return {
-        name: '__roster_updates__',
-        type: 'line' as const,
-        data: Array.from({ length: pointCount }, () => null),
-        showSymbol: false,
-        lineStyle: { opacity: 0, width: 0 },
-        itemStyle: { opacity: 0 },
-        silent: false,
-        tooltip: { show: false },
-        emphasis: { disabled: true },
-        markLine: rosterMarkLine,
-        z: 10,
-    };
-}
-
-export default function WinRateTrendChart({
+function WinRateTrendChart({
     stats,
     sourceTrend,
     showRaceWinRate = false,
@@ -169,66 +94,48 @@ export default function WinRateTrendChart({
     /** Legend label for the segment/roster average series. */
     averageSeriesLabel?: string;
 }) {
+    const scale = useChartScale();
+    const fullScaleId = useId();
     const [windowSize, setWindowSize] = useState(DEFAULT_WINDOW);
     const [forceFullScale, setForceFullScale] = useState(false);
     const [legendSelected, setLegendSelected] = useState<Record<string, boolean>>({});
-    const scoreTrend = stats.scoreTrend;
+    const view = useTrendWindow(stats.scoreTrend, sourceTrend);
+    const scoreTrend = view.trend;
     const hasData = scoreTrend.length > 0;
 
-    const dates = scoreTrend.map((d) => d.date);
-    const formattedDates = useMemo(() => dates.map(formatChartDate), [dates]);
-    const trendKeys = useMemo(() => scoreTrend.map((d) => d.fileName), [scoreTrend]);
+    const formattedDates = useMemo(() => scoreTrend.map((d) => formatChartDate(d.date)), [scoreTrend]);
     const trialOutcomes = useMemo(() => scoreTrend.map((d) => (d.won ? 1 : 0)), [scoreTrend]);
     const raceOutcomes = useMemo(
         () => scoreTrend.map((d) => d.raceWinRate ?? 0),
         [scoreTrend],
     );
-    const sourceKeys = useMemo(
-        () => sourceTrend?.map((d) => d.fileName),
-        [sourceTrend],
-    );
-    const sourceTrialOutcomes = useMemo(
-        () => sourceTrend?.map((d) => (d.won ? 1 : 0)),
-        [sourceTrend],
-    );
-    const sourceRaceOutcomes = useMemo(
-        () => sourceTrend?.map((d) => d.raceWinRate ?? 0),
-        [sourceTrend],
-    );
 
-    const rollingTrialWinRate = useMemo(
-        () => rollingAverageForVisibleWindow(
+    const rollingTrialWinRate = useMemo(() => {
+        if (view.windowed || !sourceTrend) return rollingAverage(trialOutcomes, windowSize);
+        return rollingAverageForVisibleWindow(
             trialOutcomes,
-            trendKeys,
-            sourceTrialOutcomes,
-            sourceKeys,
+            scoreTrend.map((d) => d.fileName),
+            sourceTrend.map((d) => (d.won ? 1 : 0)),
+            sourceTrend.map((d) => d.fileName),
             windowSize,
-        ),
-        [trialOutcomes, trendKeys, sourceTrialOutcomes, sourceKeys, windowSize],
-    );
+        );
+    }, [view, sourceTrend, trialOutcomes, scoreTrend, windowSize]);
 
-    const rollingRaceWinRate = useMemo(
-        () => (showRaceWinRate
-            ? rollingAverageForVisibleWindow(
-                raceOutcomes,
-                trendKeys,
-                sourceRaceOutcomes,
-                sourceKeys,
-                windowSize,
-            )
-            : []),
-        [showRaceWinRate, raceOutcomes, trendKeys, sourceRaceOutcomes, sourceKeys, windowSize],
-    );
+    const rollingRaceWinRate = useMemo(() => {
+        if (!showRaceWinRate) return [];
+        if (view.windowed || !sourceTrend) return rollingAverage(raceOutcomes, windowSize);
+        return rollingAverageForVisibleWindow(
+            raceOutcomes,
+            scoreTrend.map((d) => d.fileName),
+            sourceTrend.map((d) => d.raceWinRate ?? 0),
+            sourceTrend.map((d) => d.fileName),
+            windowSize,
+        );
+    }, [showRaceWinRate, view, sourceTrend, raceOutcomes, scoreTrend, windowSize]);
 
-    const rosterBoundaryIndices = useMemo(
-        () => scoreTrend
-            .map((point, index) => (point.rosterUpdate ? index : -1))
-            .filter((index) => index >= 0),
-        [scoreTrend],
-    );
     const rosterAverage = useMemo(
-        () => segmentAverage(trialOutcomes, rosterBoundaryIndices),
-        [trialOutcomes, rosterBoundaryIndices],
+        () => windowedSegmentAverage(trialOutcomes, view),
+        [trialOutcomes, view],
     );
 
     const primaryLabelBase = showRaceWinRate ? TRIAL_WIN_RATE_LABEL : WIN_RATE_LABEL;
@@ -241,14 +148,15 @@ export default function WinRateTrendChart({
         [windowSize],
     );
 
+    // Axis ranges only consider the points in view.
     const legendSeries = useMemo(() => {
         const series = [
-            { name: trialWinRateLabel, yAxisIndex: 0, data: rollingTrialWinRate },
+            { name: trialWinRateLabel, yAxisIndex: 0, data: sliceTrendWindow(rollingTrialWinRate, view) },
         ];
         if (showRaceWinRate) {
-            series.push({ name: raceWinRateLabel, yAxisIndex: 0, data: rollingRaceWinRate });
+            series.push({ name: raceWinRateLabel, yAxisIndex: 0, data: sliceTrendWindow(rollingRaceWinRate, view) });
         }
-        series.push({ name: averageSeriesLabel, yAxisIndex: 0, data: rosterAverage });
+        series.push({ name: averageSeriesLabel, yAxisIndex: 0, data: sliceTrendWindow(rosterAverage, view) });
         return series;
     }, [
         trialWinRateLabel,
@@ -258,7 +166,9 @@ export default function WinRateTrendChart({
         rollingRaceWinRate,
         rosterAverage,
         averageSeriesLabel,
+        view,
     ]);
+    const warmupPoints = Math.max(0, Y_SCALE_WARMUP_POINTS - view.start);
 
     useEffect(() => {
         setLegendSelected({});
@@ -269,20 +179,20 @@ export default function WinRateTrendChart({
 
         const afterWarmupVisible = collectWinRateScaleValues(legendSeries, legendSelected, {
             filterLegend: true,
-            skipFirst: Y_SCALE_WARMUP_POINTS,
+            skipFirst: warmupPoints,
         });
         if (afterWarmupVisible.length > 0) return snapWinRateYRange(afterWarmupVisible);
 
         const afterWarmupAll = collectWinRateScaleValues(legendSeries, legendSelected, {
             filterLegend: false,
-            skipFirst: Y_SCALE_WARMUP_POINTS,
+            skipFirst: warmupPoints,
         });
         if (afterWarmupAll.length > 0) return snapWinRateYRange(afterWarmupAll);
 
         const visible = collectVisibleAxisValues(legendSeries, legendSelected, 0);
         const fallback = collectAllAxisValues(legendSeries, 0);
         return snapWinRateYRange(visible.length > 0 ? visible : fallback);
-    }, [forceFullScale, legendSeries, legendSelected]);
+    }, [forceFullScale, legendSeries, legendSelected, warmupPoints]);
 
     const onEvents = useMemo(() => ({
         legendselectchanged: (params: LegendSelectChangedEvent) => {
@@ -290,18 +200,13 @@ export default function WinRateTrendChart({
         },
     }), []);
 
-    const rosterUpdateMarkLines = useMemo(
-        () => scoreTrend
-            .map((point, index) => (point.rosterUpdate ? { xAxis: index } : null))
-            .filter((line): line is { xAxis: number } => line !== null),
-        [scoreTrend],
-    );
-
-    const dateInterval = dates.length > 12 ? Math.ceil(dates.length / 8) - 1 : 0;
+    const trialPoints = useMemo(() => indexedPoints(rollingTrialWinRate), [rollingTrialWinRate]);
+    const racePoints = useMemo(() => indexedPoints(rollingRaceWinRate), [rollingRaceWinRate]);
+    const rosterPoints = useMemo(() => indexedPoints(rosterAverage), [rosterAverage]);
+    const chartHeight = scale.px(320);
 
     const option = useMemo(() => {
-        const rosterMarkLine = buildRosterMarkLine(rosterUpdateMarkLines, scoreTrend);
-        const rosterMarkerSeries = buildRosterMarkerSeries(rosterMarkLine, formattedDates.length);
+        const rosterMarkerSeries = buildRosterMarkerSeries(scoreTrend);
         const legendData = showRaceWinRate
             ? [trialWinRateLabel, raceWinRateLabel, averageSeriesLabel]
             : [trialWinRateLabel, averageSeriesLabel];
@@ -311,11 +216,12 @@ export default function WinRateTrendChart({
 
         return {
             backgroundColor: 'transparent',
+            textStyle: CHART_TEXT_STYLE,
             ...CHART_UPDATE_ANIMATION,
             axisPointer: {
                 link: [{ xAxisIndex: [0] }],
                 animation: false,
-                lineStyle: { color: '#6c757d', type: 'dashed' },
+                lineStyle: { color: CHART_COLORS.pointer, type: 'dashed' },
             },
             tooltip: {
                 ...chartTooltipStyle,
@@ -324,92 +230,58 @@ export default function WinRateTrendChart({
                     type: 'line',
                     animation: false,
                     snap: true,
-                    lineStyle: { color: '#adb5bd', type: 'dashed' },
+                    lineStyle: { color: CHART_COLORS.pointer, type: 'dashed' },
                 },
-                formatter: buildTooltipFormatter(scoreTrend),
+                formatter: buildTrendTooltipFormatter(scoreTrend, (_name, value) => formatWinRatePercent(value)),
             },
-            legend: {
-                data: legendData,
-                selected: legendSelected,
-                textStyle: { color: '#ced4da' },
-                bottom: 0,
-                itemWidth: 24,
-                itemHeight: 2,
-                icon: 'rect',
-            },
-            grid: {
-                left: GRID_LEFT,
-                right: GRID_RIGHT,
-                top: 16,
-                bottom: 48,
-                containLabel: false,
-            },
-            xAxis: {
-                type: 'category',
-                data: formattedDates,
-                boundaryGap: false,
-                axisLabel: {
-                    color: '#ced4da',
-                    interval: dateInterval,
-                    showMinLabel: true,
-                    showMaxLabel: true,
-                    alignMinLabel: 'left',
-                    alignMaxLabel: 'right',
-                },
-                axisTick: { alignWithLabel: true },
-                axisPointer: { show: true },
-            },
+            legend: chartLegend(scale, { data: legendData, selected: legendSelected }),
+            grid: { ...trendGridInsets(scale), containLabel: false },
+            xAxis: trendIndexAxis(scale, formattedDates, view),
+
             yAxis: {
-                type: 'value',
-                name: 'Win Rate',
-                nameLocation: 'middle',
-                nameRotate: 90,
-                nameGap: 50,
+                ...trendValueAxis(scale, 'Win Rate', formatWinRateTick, 'left', yRange),
                 min: yRange.min,
                 max: yRange.max,
-                axisLabel: {
-                    color: '#ced4da',
-                    fontSize: 11,
-                    width: 72,
-                    align: 'right',
-                    margin: 4,
-                    formatter: (value: number) => formatWinRatePercent(value),
-                },
-                splitLine: {
-                    show: trialVisible || raceVisible || rosterAvgVisible,
-                    lineStyle: { color: '#343a40' },
-                },
-                axisLine: { show: true, lineStyle: { color: '#6c757d' } },
+                splitLine: { ...CHART_SPLIT_LINE, show: trialVisible || raceVisible || rosterAvgVisible },
             },
             series: [
                 {
                     name: trialWinRateLabel,
                     type: 'line',
-                    data: rollingTrialWinRate,
+                    data: trialPoints,
                     smooth: true,
                     showSymbol: false,
-                    itemStyle: { color: '#6ea8fe' },
+                    itemStyle: { color: CHART_COLORS.primary },
                     lineStyle: { width: 2, type: 'solid' },
+                    areaStyle: {
+                        color: {
+                            type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+                            colorStops: [
+                                { offset: 0, color: 'rgba(77, 159, 255, 0.14)' },
+                                { offset: 1, color: 'rgba(77, 159, 255, 0)' },
+                            ],
+                        },
+                    },
                     z: 3,
                 },
                 ...(showRaceWinRate ? [{
                     name: raceWinRateLabel,
                     type: 'line' as const,
-                    data: rollingRaceWinRate,
+                    data: racePoints,
                     smooth: true,
                     showSymbol: false,
-                    itemStyle: { color: '#75b798' },
+                    itemStyle: { color: CHART_COLORS.positive },
                     lineStyle: { width: 2, type: 'solid' as const },
                     z: 4,
                 }] : []),
                 {
                     name: averageSeriesLabel,
                     type: 'line',
-                    data: rosterAverage,
+                    data: rosterPoints,
                     step: 'end',
                     showSymbol: false,
-                    itemStyle: { color: '#ffffff' },
-                    lineStyle: { width: 2, type: 'dashed' },
+                    itemStyle: { color: CHART_COLORS.average },
+                    lineStyle: { width: 1.5, type: [4, 4], opacity: 0.85 },
                     z: 5,
                 },
                 ...(rosterMarkerSeries ? [rosterMarkerSeries] : []),
@@ -417,58 +289,46 @@ export default function WinRateTrendChart({
         };
     }, [
         formattedDates,
-        dateInterval,
         trialWinRateLabel,
         raceWinRateLabel,
         showRaceWinRate,
         averageSeriesLabel,
         yRange,
-        rosterUpdateMarkLines,
+        view,
         scoreTrend,
-        rollingTrialWinRate,
-        rollingRaceWinRate,
-        rosterAverage,
+        trialPoints,
+        racePoints,
+        rosterPoints,
         legendSelected,
+        scale,
     ]);
 
     if (!hasData) return null;
 
     return (
-        <div className="win-rate-trend-chart">
-            <SectionHeading title="Win Rate Progression" compact className="mt-0 pb-0" />
-            <div className="win-rate-trend-chart-controls">
-                <div className="win-rate-trend-full-scale-row">
-                    <label
-                        htmlFor="win-rate-force-full-scale"
-                        className="win-rate-trend-full-scale-check"
-                    >
-                        <span>Force 100%</span>
-                        <input
-                            type="checkbox"
-                            id="win-rate-force-full-scale"
-                            className="form-check-input"
-                            checked={forceFullScale}
-                            onChange={(event) => setForceFullScale(event.target.checked)}
-                        />
-                    </label>
-                </div>
-                <div className="d-flex align-items-center gap-2">
-                    <Form.Label className="text-secondary small mb-0">Lookback Period</Form.Label>
-                    <Form.Control
-                        type="number"
-                        min={1}
-                        max={500}
-                        value={windowSize}
-                        onChange={(e) => {
-                            const next = Number(e.target.value);
-                            if (Number.isFinite(next) && next >= 1) setWindowSize(next);
-                        }}
-                        style={{ width: '5rem' }}
-                        size="sm"
-                    />
-                </div>
-            </div>
-            <ReactECharts option={option} onEvents={onEvents} style={{ height: 280 }} />
+        <div className="chart-block win-rate-trend-chart">
+            <SectionHeading
+                title="Win Rate Progression"
+                compact
+                actions={(
+                    <div className="chart-tools">
+                        <label htmlFor={fullScaleId} className="chart-check">
+                            <span>Force 0–100%</span>
+                            <input
+                                type="checkbox"
+                                id={fullScaleId}
+                                className="form-check-input"
+                                checked={forceFullScale}
+                                onChange={(event) => setForceFullScale(event.target.checked)}
+                            />
+                        </label>
+                        <TrendNumberInput label="Lookback" value={windowSize} max={500} onChange={setWindowSize} />
+                    </div>
+                )}
+            />
+            <EChart morph option={option} onEvents={onEvents} style={{ height: chartHeight }} />
         </div>
     );
 }
+
+export default memo(WinRateTrendChart);

@@ -51,7 +51,10 @@ export default function DashboardLayout() {
         });
         return map;
     }, [sessions, scoreBonuses]);
-    const rosterGrid = useMemo(() => getTeamRosterGrid(sessions, scoreBonuses), [sessions, scoreBonuses]);
+    const rosterGrid = useMemo(
+        () => getTeamRosterGrid(sessions, overallStats?.playerUmas ?? []),
+        [sessions, overallStats],
+    );
     const historicalUmas = useMemo(() => listHistoricalUmas(sessions, scoreBonuses), [sessions, scoreBonuses]);
 
     const outletContext = useMemo((): DashboardOutletContext => ({

@@ -1,5 +1,6 @@
 import _ from "lodash";
 import UMDatabaseWrapper from "./UMDatabaseWrapper";
+import type { Skill } from "./data_pb";
 
 export type CharaSkill = {
     skillId: number,
@@ -126,6 +127,34 @@ type StatusPoints = {
     wiz: number,
 }
 
+type SkillAptitudeTags = { runningStyles: number[], distances: number[], grounds: number[] };
+
+const skillAptitudeTagCache = new WeakMap<Skill, SkillAptitudeTags>();
+
+function skillAptitudeTags(skill: Skill): SkillAptitudeTags {
+    let tags = skillAptitudeTagCache.get(skill);
+    if (!tags) {
+        const tagIds = new Set(skill.tagId);
+        tags = {
+            runningStyles: [1, 2, 3, 4].filter(tag => tagIds.has('10' + tag)),
+            distances: [1, 2, 3, 4].filter(tag => tagIds.has('20' + tag)),
+            grounds: [1, 2].filter(tag => tagIds.has('50' + tag)),
+        };
+        skillAptitudeTagCache.set(skill, tags);
+    }
+    return tags;
+}
+
+/** Highest multiplier among the skill's tagged aptitudes, or 1 when none apply. */
+function bestAptitudeMultiplier(tags: number[], aptitudes: Record<number, number>): number {
+    let best = 0;
+    for (const tag of tags) {
+        const multiplier = properSkillMultiplier[aptitudes[tag]];
+        if (multiplier !== undefined && multiplier > best) best = multiplier;
+    }
+    return best === 0 ? 1 : best;
+}
+
 function calcRankScore(raceHorseData: any, statusPoints: StatusPoints, charaSkills: CharaSkill[], properRunningStyles: Record<number, number>, properDistances: Record<number, number>, properGrounds: Record<number, number>): number {
     if (raceHorseData['rank_score']) {
         return raceHorseData['rank_score'];
@@ -144,28 +173,10 @@ function calcRankScore(raceHorseData: any, statusPoints: StatusPoints, charaSkil
             // 固有スキル
             rankScore += skill.gradeValue! / 2 * charaSkill.level;
         } else {
-            const tagIds = new Set(skill.tagId);
-            let runningStyleMultiplier = 0;
-            [1, 2, 3, 4].forEach(runningStyleTag => {
-                if (tagIds.has('10' + runningStyleTag.toString())) {
-                    runningStyleMultiplier = _.max([runningStyleMultiplier, properSkillMultiplier[properRunningStyles[runningStyleTag]]])!;
-                }
-            });
-            if (runningStyleMultiplier === 0) runningStyleMultiplier = 1;
-            let distanceMultiplier = 0;
-            [1, 2, 3, 4].forEach(distanceTag => {
-                if (tagIds.has('20' + distanceTag.toString())) {
-                    distanceMultiplier = _.max([distanceMultiplier, properSkillMultiplier[properDistances[distanceTag]]])!;
-                }
-            });
-            if (distanceMultiplier === 0) distanceMultiplier = 1;
-            let groundMultiplier = 0;
-            [1, 2].forEach(groundTag => {
-                if (tagIds.has('50' + groundTag.toString())) {
-                    groundMultiplier = _.max([groundMultiplier, properSkillMultiplier[properGrounds[groundTag]]])!;
-                }
-            });
-            if (groundMultiplier === 0) groundMultiplier = 1;
+            const tags = skillAptitudeTags(skill);
+            const runningStyleMultiplier = bestAptitudeMultiplier(tags.runningStyles, properRunningStyles);
+            const distanceMultiplier = bestAptitudeMultiplier(tags.distances, properDistances);
+            const groundMultiplier = bestAptitudeMultiplier(tags.grounds, properGrounds);
             rankScore += Math.round(skill.gradeValue! * runningStyleMultiplier * distanceMultiplier * groundMultiplier);
         }
     }
