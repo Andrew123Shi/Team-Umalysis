@@ -1,14 +1,21 @@
+import { useMemo } from 'react';
 import type { ScoreBreakdownSummary } from '../../analytics/types';
 import SectionHeading from '../SectionHeading';
 import InfoTip from '../InfoTip';
 import { formatScore } from '../../utils/formatScore';
+import { CHART_COLORS } from './chartTheme';
+import HistogramTip, { type HistogramSeries } from './HistogramTip';
+import { FIELD_SIZE } from './RangeTrack';
+import { PLACE_COLORS, ordinal } from './StatCards';
 
 type Row = {
     label: string;
     value: string;
-    score: string;
+    /** Omitted for rows that award no points. */
+    score?: string;
     detail?: string;
     negative?: boolean;
+    histogram?: HistogramSeries[];
 };
 
 function fmtPct(value: number) {
@@ -32,22 +39,71 @@ function fmtSeconds(value: number) {
     return `${Number.isInteger(rounded) ? rounded : rounded.toFixed(1)} s`;
 }
 
-export default function ScoreBreakdownPanel({ breakdown }: { breakdown: ScoreBreakdownSummary }) {
+function fmtRank(value: number) {
+    return Number.isInteger(value) ? ordinal(value) : value.toFixed(1);
+}
+
+function fmtCount(value: number) {
+    return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+function fmtActivations(value: number) {
+    return `${value} activation${value === 1 ? '' : 's'}`;
+}
+
+function pointsSeries(values: number[] | undefined, unit: string, negative = false): HistogramSeries {
+    return {
+        label: 'Points',
+        values: values ?? [],
+        format: formatScore,
+        unit,
+        color: negative ? CHART_COLORS.negative : CHART_COLORS.positive,
+    };
+}
+
+function buildRows(breakdown: ScoreBreakdownSummary): Row[] {
+    const { distributions } = breakdown;
     const hasWinMargin = breakdown.winMarginWinCount > 0;
     const hasRushedDuration = breakdown.rushedDurationCount > 0;
-    const rows: Row[] = [
+    const skillSeries = (distribution: ScoreBreakdownSummary['distributions']['goldSkills']): HistogramSeries[] => [
+        {
+            label: 'Result',
+            values: distribution.result,
+            format: fmtCount,
+            unit: 'races',
+            discrete: { min: 0, label: fmtActivations },
+        },
+    ];
+
+    return [
         {
             label: 'Average Finish Position',
             value: fmtPlacement(breakdown.avgFinishOrder),
             score: formatScore(breakdown.avgFinishPositionScore),
             negative: breakdown.avgFinishPositionScore < 0,
             detail: 'Average placement and base points from final position',
+            histogram: [
+                {
+                    label: 'Result',
+                    values: distributions.finishPosition.result,
+                    format: fmtRank,
+                    unit: 'races',
+                    discrete: { min: 1, max: FIELD_SIZE, label: ordinal, color: (place) => PLACE_COLORS[place - 1] },
+                    minLabel: 'best',
+                    maxLabel: 'worst',
+                },
+                pointsSeries(distributions.finishPosition.points, 'races'),
+            ],
         },
         {
             label: 'Win Margin for Wins',
             value: breakdown.winMarginLengthCount > 0 ? fmtLengths(breakdown.avgWinMarginLengths) : '—',
             score: hasWinMargin ? formatScore(breakdown.avgWinMarginBonus) : '—',
             detail: 'Average gap to 2nd place (from replay) and score bonus from the winning margin, averaged over wins',
+            histogram: [
+                { label: 'Result', values: distributions.winMargin.result, format: fmtLengths, unit: 'wins' },
+                pointsSeries(distributions.winMargin.points, 'wins'),
+            ],
         },
         {
             label: 'Strong Start Rate',
@@ -68,6 +124,20 @@ export default function ScoreBreakdownPanel({ breakdown }: { breakdown: ScoreBre
             detail: 'Share of races the uma was leading amongst all runners with the same style entering late-race',
         },
         {
+            label: 'Average Popularity',
+            value: breakdown.popularityCount > 0 ? fmtPlacement(breakdown.avgPopularity) : '—',
+            detail: 'Average favorite rank going into the race, where 1 is the favorite',
+            histogram: [
+                {
+                    label: 'Result',
+                    values: distributions.popularity.result,
+                    format: fmtRank,
+                    unit: 'races',
+                    discrete: { min: 1, max: FIELD_SIZE, label: (rank) => `${ordinal(rank)} favorite` },
+                },
+            ],
+        },
+        {
             label: 'Long Shot Bonus Rate',
             value: fmtPct(breakdown.longShotRate),
             score: formatScore(breakdown.avgLongShotBonus),
@@ -84,12 +154,14 @@ export default function ScoreBreakdownPanel({ breakdown }: { breakdown: ScoreBre
             value: fmtActivationsWithRate(breakdown.avgGoldSkillActivations, breakdown.goldSkillActivationRate),
             score: formatScore(breakdown.avgGoldSkillPoints),
             detail: 'Average number of activations and percent of total learned gold skills actually activated',
+            histogram: skillSeries(distributions.goldSkills),
         },
         {
             label: 'Regular Skills per Race',
             value: fmtActivationsWithRate(breakdown.avgRegularSkillActivations, breakdown.regularSkillActivationRate),
             score: formatScore(breakdown.avgRegularSkillPoints),
             detail: 'Average number of activations and percent of total learned regular skills actually activated',
+            histogram: skillSeries(distributions.regularSkills),
         },
         {
             label: 'Target Time Beat Rate',
@@ -110,8 +182,21 @@ export default function ScoreBreakdownPanel({ breakdown }: { breakdown: ScoreBre
             score: hasRushedDuration ? formatScore(breakdown.avgRushedDurationPenalty) : '—',
             negative: hasRushedDuration && breakdown.avgRushedDurationPenalty < 0,
             detail: 'Average Rushed duration and point penalty from Rushed duration only (excluding the -500 base Rushed penalty)',
+            histogram: [
+                { label: 'Result', values: distributions.rushedDuration.result, format: fmtSeconds, unit: 'rushed races' },
+                pointsSeries(distributions.rushedDuration.points, 'rushed races', true),
+            ],
+        },
+        {
+            label: 'Unique Style',
+            value: fmtPct(breakdown.uniqueStyleRate),
+            detail: 'Share of races where no other runner has this style',
         },
     ];
+}
+
+export default function ScoreBreakdownPanel({ breakdown }: { breakdown: ScoreBreakdownSummary }) {
+    const rows = useMemo(() => buildRows(breakdown), [breakdown]);
 
     return (
         <section className="app-card score-breakdown-panel">
@@ -128,7 +213,12 @@ export default function ScoreBreakdownPanel({ breakdown }: { breakdown: ScoreBre
                             <span className="score-breakdown-label-text">{row.label}</span>
                             {row.detail && <InfoTip id={`score-breakdown-${row.label}`} tip={row.detail} />}
                         </span>
-                        <span className="score-breakdown-result" role="cell">{row.value}</span>
+                        <span className="score-breakdown-result" role="cell">
+                            {row.histogram?.some((series) => series.values.length > 0) && (
+                                <HistogramTip title={row.label} series={row.histogram} />
+                            )}
+                            {row.value}
+                        </span>
                         <span className={`score-breakdown-score${row.negative ? ' is-negative' : ''}`} role="cell">
                             {row.score}
                         </span>

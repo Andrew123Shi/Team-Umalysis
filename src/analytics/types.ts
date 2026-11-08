@@ -27,6 +27,23 @@ export type ScoreEvent = {
     bonusScores: ScoreBonusBreakdown;
 };
 
+/** Per-race values behind one breakdown row; `points` is omitted when the row scores nothing. */
+export type BreakdownDistribution = {
+    result: number[];
+    points?: number[];
+};
+
+export type ScoreBreakdownDistributions = {
+    finishPosition: BreakdownDistribution;
+    /** Wins only. */
+    winMargin: BreakdownDistribution;
+    popularity: BreakdownDistribution;
+    goldSkills: BreakdownDistribution;
+    regularSkills: BreakdownDistribution;
+    /** Rushed races with a recorded duration only. */
+    rushedDuration: BreakdownDistribution;
+};
+
 export type ScoreBreakdownSummary = {
     raceCount: number;
     avgFinishOrder: number;
@@ -43,6 +60,9 @@ export type ScoreBreakdownSummary = {
     avgGoodLatePositionBonus: number;
     strongStartRate: number;
     avgStrongStartBonus: number;
+    /** Average favorite rank (1 = favorite) over races that recorded one. */
+    avgPopularity: number;
+    popularityCount: number;
     /** Top-3 finishes at popularity 8 or lower. */
     longShotRate: number;
     avgLongShotBonus: number;
@@ -62,6 +82,9 @@ export type ScoreBreakdownSummary = {
     avgRushedDurationSeconds: number;
     avgRushedDurationPenalty: number;
     rushedDurationCount: number;
+    /** Share of races where no other runner shares this uma's style. */
+    uniqueStyleRate: number;
+    distributions: ScoreBreakdownDistributions;
 };
 
 export type AptitudeSet = {
@@ -95,6 +118,10 @@ export type UmaEntry = {
     skills: SkillRef[];
     finishOrder: number;
     finishTime: number;
+    /** Favorite rank going into the race; 1 = favorite. */
+    popularity?: number;
+    /** No other runner in the race shares this style (Runaway counts as Front). */
+    uniqueStyle: boolean;
     winMarginLengths?: number;
     totalScore: number;
     totalBaseScore: number;
@@ -198,14 +225,34 @@ export type MatchupEntry = {
     avgNormalizedScore: number;
 };
 
+/** One row of a racetrack table, keyed by course id, race track id or distance in meters. */
 export type TrackMatchupEntry = {
-    courseId: number;
+    id: number;
     displayName: string;
     appearances: number;
     avgPlacement: number;
     winRate: number;
     occurrenceRate: number;
     avgNormalizedScore: number;
+};
+
+export type DistributionSlice = {
+    key: string;
+    label: string;
+    count: number;
+    share: number;
+    winRate: number;
+};
+
+export type ConditionDistributions = {
+    season: DistributionSlice[];
+    weather: DistributionSlice[];
+    trackCondition: DistributionSlice[];
+    /** Counted per uma entry; win rate is that uma finishing 1st. */
+    mood: DistributionSlice[];
+    moodWithoutParfaits: DistributionSlice[];
+    /** Team Trials in scope where all 15 umas were at Great mood. */
+    parfaitSessions: number;
 };
 
 export type StyleMatchupEntry = {
@@ -326,6 +373,11 @@ export type AggregatedStats = {
     whiteActivations: NumericSummary;
     matchups: MatchupEntry[];
     trackMatchups: TrackMatchupEntry[];
+    trackLocationMatchups: TrackMatchupEntry[];
+    distanceMatchups: TrackMatchupEntry[];
+    standardDistanceDistribution: DistributionSlice[];
+    turnDistribution: DistributionSlice[];
+    conditions: ConditionDistributions;
     styleMatchups: StyleMatchupEntry[];
     styleSaturation: StyleSaturationData | null;
     scoreTrend: ScoreTrendPoint[];

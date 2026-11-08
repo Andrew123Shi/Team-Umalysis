@@ -30,6 +30,7 @@ type MatchupRow = {
     occurrenceRate: number;
     avgNormalizedScore?: number;
     cardId?: number;
+    barColor?: string;
 };
 
 const TRACK_HUES: Record<string, number> = {
@@ -68,16 +69,18 @@ function fallbackHue(value: string): number {
 function toRows(
     entries: MatchupEntry[] | TrackMatchupEntry[],
     variant: MatchupVariant,
+    trackColor?: (entry: TrackMatchupEntry) => string,
 ): MatchupRow[] {
     if (variant === 'track') {
         return (entries as TrackMatchupEntry[]).map((e) => ({
-            key: `track-${e.courseId}`,
+            key: `track-${e.id}`,
             displayName: e.displayName,
             appearances: e.appearances,
             avgPlacement: e.avgPlacement,
             winRate: e.winRate,
             occurrenceRate: e.occurrenceRate,
             avgNormalizedScore: e.avgNormalizedScore,
+            barColor: trackColor?.(e) ?? trackBarColor(e.displayName),
         }));
     }
     return (entries as MatchupEntry[]).map((e) => ({
@@ -127,6 +130,7 @@ function MatchupRows({
     showNormalizedScore = false,
     scoreColumnLabel,
     showOccurrenceFilter = variant !== 'track',
+    trackColor,
 }: {
     entries: MatchupEntry[] | TrackMatchupEntry[];
     title: string;
@@ -140,6 +144,7 @@ function MatchupRows({
     showNormalizedScore?: boolean;
     scoreColumnLabel?: string;
     showOccurrenceFilter?: boolean;
+    trackColor?: (entry: TrackMatchupEntry) => string;
 }) {
     const resolvedOccurrenceFilter: OccurrenceFilter = showOccurrenceFilter
         ? defaultOccurrenceFilter
@@ -147,7 +152,7 @@ function MatchupRows({
     const [occurrenceFilter, setOccurrenceFilter] = useState<OccurrenceFilter>(resolvedOccurrenceFilter);
     const [sortKey, setSortKey] = useState<SortKey>(defaultSortKey);
     const [sortDir, setSortDir] = useState<SortDir>(defaultSortDir);
-    const rows = useMemo(() => toRows(entries, variant), [entries, variant]);
+    const rows = useMemo(() => toRows(entries, variant, trackColor), [entries, variant, trackColor]);
     const label = nameColumnLabel ?? (variant === 'track' ? 'Racetrack' : 'Uma');
     const instancesLabel = compactColumns ? 'N' : 'Instances';
     const avgPlacementLabel = compactColumns ? 'Pos' : 'Avg Pos';
@@ -192,14 +197,16 @@ function MatchupRows({
     );
     const accentColors = useImageAccentColors(colorSources);
     const showScoreColumn = variant === 'track' || showNormalizedScore;
+    const barKey: ValueKey | undefined = sortKey === 'displayName' && variant === 'track' ? 'appearances' : undefined;
+    const barMetric = barKey ?? sortKey;
     const metricValue = (row: MatchupRow) => {
-        if (sortKey === 'appearances') return Math.max(0, row.appearances);
-        if (sortKey === 'avgPlacement') return Math.max(0, row.avgPlacement);
-        if (sortKey === 'winRate') return Math.max(0, row.winRate);
-        if (sortKey === 'avgNormalizedScore') return Math.max(0, row.avgNormalizedScore ?? 0);
+        if (barMetric === 'appearances') return Math.max(0, row.appearances);
+        if (barMetric === 'avgPlacement') return Math.max(0, row.avgPlacement);
+        if (barMetric === 'winRate') return Math.max(0, row.winRate);
+        if (barMetric === 'avgNormalizedScore') return Math.max(0, row.avgNormalizedScore ?? 0);
         return Math.max(0, row.winRate);
     };
-    const metricIsRate = sortKey === 'winRate' || sortKey === 'displayName';
+    const metricIsRate = barMetric === 'winRate' || barMetric === 'displayName';
     const maxBarValue = Math.max(metricIsRate ? 1 : 0.0001, ...visible.map(metricValue));
 
     const columns = useMemo(() => {
@@ -230,9 +237,8 @@ function MatchupRows({
                 avgNormalizedScore: formatScore(e.avgNormalizedScore ?? 0),
             },
             barPct: (metricValue(e) / maxBarValue) * 100,
-            barColor: variant === 'track'
-                ? trackBarColor(e.displayName)
-                : (e.cardId ? getUmaImageColorByCardId(e.cardId) : undefined)
+            barColor: e.barColor
+                ?? (e.cardId ? getUmaImageColorByCardId(e.cardId) : undefined)
                     ?? accentColors[e.key]
                     ?? fallbackAccentColor(e.cardId ?? e.displayName),
         };
@@ -259,6 +265,7 @@ function MatchupRows({
             rows={barRows}
             sortKey={sortKey}
             sortDir={sortDir}
+            barKey={barKey}
             onSort={handleSort}
             emptyText="Not enough data"
         />
@@ -278,6 +285,7 @@ function MatchupTable({
     showNormalizedScore = false,
     scoreColumnLabel,
     showOccurrenceFilter,
+    trackColor,
 }: {
     entries: MatchupEntry[] | TrackMatchupEntry[];
     title: string;
@@ -291,6 +299,8 @@ function MatchupTable({
     showNormalizedScore?: boolean;
     scoreColumnLabel?: string;
     showOccurrenceFilter?: boolean;
+    /** Track variant only: overrides the bar color derived from the row name. */
+    trackColor?: (entry: TrackMatchupEntry) => string;
 }) {
     return (
         <MatchupRows
@@ -306,6 +316,7 @@ function MatchupTable({
             showNormalizedScore={showNormalizedScore}
             scoreColumnLabel={scoreColumnLabel}
             showOccurrenceFilter={showOccurrenceFilter}
+            trackColor={trackColor}
         />
     );
 }

@@ -9,9 +9,9 @@ import { OUTCOME_COLORS, WinRateDonut, WinRateLegend, WinRateRings, TeamPlacemen
 export type StatCardViewMode = 'team' | 'uma' | 'distance';
 
 /** Gold / silver / bronze for the podium, then tan for the remaining scoring places. */
-const PLACE_COLORS = ['#f2c14e', '#c9d1d9', '#d08a4f', '#e8d4b6', '#e8d4b6'];
+export const PLACE_COLORS = ['#f2c14e', '#c9d1d9', '#d08a4f', '#e8d4b6', '#e8d4b6'];
 
-function ordinal(n: number): string {
+export function ordinal(n: number): string {
     const mod100 = n % 100;
     if (mod100 >= 11 && mod100 <= 13) return `${n}th`;
     const suffix = ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th';

@@ -195,6 +195,13 @@ export function aggregateScoreBreakdown(
 
     let finishOrderTotal = 0;
     let finishPositionTotal = 0;
+    const finishOrders: number[] = [];
+    const finishPositionScores: number[] = [];
+    const popularities: number[] = [];
+    const goldActivationCounts: number[] = [];
+    const goldSkillScores: number[] = [];
+    const regularActivationCounts: number[] = [];
+    const regularSkillScores: number[] = [];
     const winMarginBonuses: number[] = [];
     const winMarginLengths: number[] = [];
     let goodMidCount = 0;
@@ -218,6 +225,7 @@ export function aggregateScoreBreakdown(
     let rushedCount = 0;
     let beatTargetTotal = 0;
     let rushedTotal = 0;
+    let uniqueStyleCount = 0;
     const rushedDurations: number[] = [];
     const rushedDurationPenalties: number[] = [];
 
@@ -225,6 +233,9 @@ export function aggregateScoreBreakdown(
         const race = breakdownRaceScoreEvents(entry.scoreEvents, bonuses);
         finishOrderTotal += entry.finishOrder;
         finishPositionTotal += race.finishPositionScore;
+        finishOrders.push(entry.finishOrder);
+        finishPositionScores.push(race.finishPositionScore);
+        if (entry.popularity !== undefined) popularities.push(entry.popularity);
         if (entry.finishOrder === 1) {
             winMarginBonuses.push(race.winMarginBonus);
             if (entry.winMarginLengths !== undefined) {
@@ -243,6 +254,10 @@ export function aggregateScoreBreakdown(
         const learned = countLearnedSkills(entry);
         goldSkillTotal += race.goldSkillPoints;
         regularSkillTotal += race.regularSkillPoints;
+        goldActivationCounts.push(activations.gold);
+        goldSkillScores.push(race.goldSkillPoints);
+        regularActivationCounts.push(activations.regular);
+        regularSkillScores.push(race.regularSkillPoints);
         uniqueSkillTotal += race.uniqueSkillPoints > 0
             ? race.uniqueSkillPoints
             : uniqueSkillActivationPoints(entry);
@@ -262,6 +277,7 @@ export function aggregateScoreBreakdown(
                 rushedDurationPenalties.push(race.rushedDurationPenalty);
             }
         }
+        if (entry.uniqueStyle) uniqueStyleCount += 1;
     });
 
     const raceCount = entries.length;
@@ -272,6 +288,8 @@ export function aggregateScoreBreakdown(
     const rushedDurationCount = rushedDurations.length;
     const rushedDurationTotal = rushedDurations.reduce((sum, value) => sum + value, 0);
     const rushedDurationPenaltyTotal = rushedDurationPenalties.reduce((sum, value) => sum + value, 0);
+    const popularityCount = popularities.length;
+    const popularityTotal = popularities.reduce((sum, value) => sum + value, 0);
     return {
         raceCount,
         avgFinishOrder: finishOrderTotal / raceCount,
@@ -286,6 +304,8 @@ export function aggregateScoreBreakdown(
         avgGoodLatePositionBonus: goodLateTotal / raceCount,
         strongStartRate: strongStartCount / raceCount,
         avgStrongStartBonus: strongStartTotal / raceCount,
+        avgPopularity: popularityCount > 0 ? popularityTotal / popularityCount : 0,
+        popularityCount,
         longShotRate: longShotCount / raceCount,
         avgLongShotBonus: longShotTotal / raceCount,
         avgUniqueSkillActivations: totalUniqueSkillActivations / raceCount,
@@ -310,5 +330,14 @@ export function aggregateScoreBreakdown(
         avgRushedDurationSeconds: rushedDurationCount > 0 ? rushedDurationTotal / rushedDurationCount : 0,
         avgRushedDurationPenalty: rushedDurationCount > 0 ? rushedDurationPenaltyTotal / rushedDurationCount : 0,
         rushedDurationCount,
+        uniqueStyleRate: uniqueStyleCount / raceCount,
+        distributions: {
+            finishPosition: { result: finishOrders, points: finishPositionScores },
+            winMargin: { result: winMarginLengths, points: winMarginBonuses },
+            popularity: { result: popularities },
+            goldSkills: { result: goldActivationCounts, points: goldSkillScores },
+            regularSkills: { result: regularActivationCounts, points: regularSkillScores },
+            rushedDuration: { result: rushedDurations, points: rushedDurationPenalties },
+        },
     };
 }

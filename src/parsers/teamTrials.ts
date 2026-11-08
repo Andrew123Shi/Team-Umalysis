@@ -317,6 +317,7 @@ function buildUmaEntry(
     const rankScore = trained.rankScore;
     const cardId = trained.cardId;
     const buildKey = buildUmaFingerprint({ stats, rankScore });
+    const popularity = Number(horse.popularity);
     return {
         buildKey,
         trainedCharaId: Number(horse.trained_chara_id),
@@ -335,6 +336,7 @@ function buildUmaEntry(
         skills: trained.skills,
         finishOrder: Number(charaResult?.finish_order ?? 99),
         finishTime: Number(charaResult?.finish_time ?? 0),
+        ...(Number.isFinite(popularity) && popularity > 0 ? { popularity } : {}),
         ...(winMarginLengths !== undefined ? { winMarginLengths } : {}),
         totalScore: scoreEvents.reduce((sum, e) => sum + e.score, 0),
         totalBaseScore: scoreEvents.reduce((sum, e) => sum + e.baseScore, 0),
@@ -342,7 +344,24 @@ function buildUmaEntry(
         activatedSkillIds: extractActivatedSkills(scenario, frameOrder),
         motivation: Number(horse.motivation ?? 3),
         starCount: Math.min(5, Math.max(0, Number(horse.rarity ?? horse.talent_level ?? 0))),
+        uniqueStyle: false,
     };
+}
+
+/** Runaway is a Front runner in game, so the two share a style here. */
+function baseRunningStyle(runningStyle: number): number {
+    return runningStyle === 5 ? 1 : runningStyle;
+}
+
+function markUniqueStyles(runners: UmaEntry[]) {
+    const counts = new Map<number, number>();
+    runners.forEach((runner) => {
+        const style = baseRunningStyle(runner.runningStyle);
+        counts.set(style, (counts.get(style) ?? 0) + 1);
+    });
+    runners.forEach((runner) => {
+        runner.uniqueStyle = counts.get(baseRunningStyle(runner.runningStyle)) === 1;
+    });
 }
 
 type ParsedTeamTrialRace = { view: ParsedRaceView; scenario: RaceScenarioSummary };
@@ -465,6 +484,7 @@ export function parseTeamTrialSession(json: any, fileName: string): TTSession | 
             else if (entry.teamId === opponentTeamId) opponentUmas.push(entry);
             else npcUmas.push(entry);
         });
+        markUniqueStyles([...playerUmas, ...opponentUmas, ...npcUmas]);
 
         const winType = Number(result.win_type ?? 0);
         rounds.push({

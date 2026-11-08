@@ -25,6 +25,28 @@ import { VICTORY_MIN_ROUND_WINS } from './scoreIds';
 import { buildStyleSaturation } from './styleSaturation';
 import { DISTANCE_LABELS, DISTANCE_ORDER, STRATEGY_LABELS } from './types';
 import {
+    getCourseDistanceMeters,
+    getCourseRaceTrackId,
+    getCourseTurn,
+    getTrackLocationName,
+} from '../utils/course';
+import {
+    addToCounts,
+    isParfaitSession,
+    MOOD_META,
+    resolveSeasonKey,
+    resolveTrackConditionKey,
+    resolveWeatherKey,
+    SEASON_META,
+    STANDARD_DISTANCE_META,
+    standardDistanceKey,
+    toSlices,
+    TRACK_CONDITION_META,
+    TURN_META,
+    WEATHER_META,
+    type DistributionCounts,
+} from './raceConditions';
+import {
     BASE_SCORE_ONLY,
     inGameRoundScore,
     inGameSessionScore,
@@ -46,7 +68,7 @@ function countPlacements(placements: number[]): number[] {
     return counts;
 }
 
-function summarize(values: number[]): NumericSummary {
+export function summarize(values: number[]): NumericSummary {
     if (values.length === 0) {
         return { count: 0, avg: 0, median: 0, min: 0, max: 0 };
     }
@@ -292,57 +314,71 @@ function scoreBonuses(options?: AggregateOptions): ScoreBonusSettings {
     return options?.scoreBonuses ?? BASE_SCORE_ONLY;
 }
 
-function buildTrackMatchups(
+function forEachScopedRound(
     sessions: TTSession[],
-    options?: AggregateOptions,
-): TrackMatchupEntry[] {
-    const bonuses = scoreBonuses(options);
-    let totalRounds = 0;
-    const map = new Map<number, {
-        instances: number;
-        placements: number[];
-        roundWins: number;
-        normalizedScores: number[];
-    }>();
-
+    options: AggregateOptions | undefined,
+    visit: (round: TTRound, session: TTSession) => void,
+) {
     sessions.forEach((session) => {
         session.rounds.forEach((round) => {
             if (options?.distanceType !== undefined && round.distanceType !== options.distanceType) return;
             if (options?.buildKey !== undefined) {
                 if (!round.playerUmas.some((u) => u.buildKey === options.buildKey)) return;
             }
-            const courseId = round.courseId;
-            if (!courseId) return;
-
-            totalRounds += 1;
-            const entry = map.get(courseId) ?? {
-                instances: 0,
-                placements: [],
-                roundWins: 0,
-                normalizedScores: [],
-            };
-            entry.instances += 1;
-            let countedWin = false;
-            round.playerUmas.forEach((player) => {
-                if (options?.buildKey !== undefined && player.buildKey !== options.buildKey) return;
-                entry.placements.push(player.finishOrder);
-                if (!countedWin) {
-                    if (options?.buildKey !== undefined) {
-                        if (player.finishOrder === 1) entry.roundWins += 1;
-                    } else if (round.playerWonRound) {
-                        entry.roundWins += 1;
-                    }
-                    countedWin = true;
-                }
-            });
-            entry.normalizedScores.push(roundScore(round, bonuses, options?.buildKey));
-            map.set(courseId, entry);
+            visit(round, session);
         });
     });
+}
 
-    return Array.from(map.entries()).map(([courseId, e]) => ({
-        courseId,
-        displayName: trackDisplayName(courseId),
+function roundWon(round: TTRound, options?: AggregateOptions): boolean {
+    if (options?.buildKey === undefined) return round.playerWonRound;
+    return round.playerUmas.some((player) => player.buildKey === options.buildKey && player.finishOrder === 1);
+}
+
+function buildKeyedTrackMatchups(
+    sessions: TTSession[],
+    options: AggregateOptions | undefined,
+    resolve: (round: TTRound) => { id: number; displayName: string } | null,
+): TrackMatchupEntry[] {
+    const bonuses = scoreBonuses(options);
+    let totalRounds = 0;
+    const map = new Map<number, {
+        displayName: string;
+        instances: number;
+        placements: number[];
+        roundWins: number;
+        normalizedScores: number[];
+    }>();
+
+    forEachScopedRound(sessions, options, (round) => {
+        const resolved = resolve(round);
+        if (!resolved) return;
+
+        totalRounds += 1;
+        const entry = map.get(resolved.id) ?? {
+            displayName: resolved.displayName,
+            instances: 0,
+            placements: [],
+            roundWins: 0,
+            normalizedScores: [],
+        };
+        entry.instances += 1;
+        let countedWin = false;
+        round.playerUmas.forEach((player) => {
+            if (options?.buildKey !== undefined && player.buildKey !== options.buildKey) return;
+            entry.placements.push(player.finishOrder);
+            if (!countedWin) {
+                if (roundWon(round, options)) entry.roundWins += 1;
+                countedWin = true;
+            }
+        });
+        entry.normalizedScores.push(roundScore(round, bonuses, options?.buildKey));
+        map.set(resolved.id, entry);
+    });
+
+    return Array.from(map.entries()).map(([id, e]) => ({
+        id,
+        displayName: e.displayName,
         appearances: e.instances,
         avgPlacement: e.placements.length > 0
             ? e.placements.reduce((a, b) => a + b, 0) / e.placements.length
@@ -353,6 +389,86 @@ function buildTrackMatchups(
             ? e.normalizedScores.reduce((a, b) => a + b, 0) / e.normalizedScores.length
             : 0,
     }));
+}
+
+function buildTrackMatchups(sessions: TTSession[], options?: AggregateOptions): TrackMatchupEntry[] {
+    return buildKeyedTrackMatchups(sessions, options, (round) => {
+        if (!round.courseId) return null;
+        return { id: round.courseId, displayName: trackDisplayName(round.courseId) };
+    });
+}
+
+function buildTrackLocationMatchups(sessions: TTSession[], options?: AggregateOptions): TrackMatchupEntry[] {
+    return buildKeyedTrackMatchups(sessions, options, (round) => {
+        const raceTrackId = getCourseRaceTrackId(round.courseId);
+        const displayName = getTrackLocationName(round.courseId);
+        if (raceTrackId == null || !displayName) return null;
+        return { id: raceTrackId, displayName };
+    });
+}
+
+function buildDistanceMatchups(sessions: TTSession[], options?: AggregateOptions): TrackMatchupEntry[] {
+    return buildKeyedTrackMatchups(sessions, options, (round) => {
+        const distance = getCourseDistanceMeters(round.courseId);
+        if (distance == null) return null;
+        return { id: distance, displayName: `${distance}m` };
+    });
+}
+
+function buildRaceDistributions(
+    sessions: TTSession[],
+    options?: AggregateOptions,
+): Pick<AggregatedStats, 'standardDistanceDistribution' | 'turnDistribution' | 'conditions'> {
+    const standard: DistributionCounts = new Map();
+    const turn: DistributionCounts = new Map();
+    const season: DistributionCounts = new Map();
+    const weather: DistributionCounts = new Map();
+    const ground: DistributionCounts = new Map();
+    const mood: DistributionCounts = new Map();
+    const moodWithoutParfaits: DistributionCounts = new Map();
+    const parfaitBySession = new Map<string, boolean>();
+
+    forEachScopedRound(sessions, options, (round, session) => {
+        const won = roundWon(round, options);
+        const distance = getCourseDistanceMeters(round.courseId);
+        if (distance != null) addToCounts(standard, standardDistanceKey(distance), won);
+        const turnKey = getCourseTurn(round.courseId);
+        if (turnKey) addToCounts(turn, turnKey, won);
+
+        const details = round.parsedRace.trackDetails;
+        const seasonKey = resolveSeasonKey(details?.season);
+        if (seasonKey) addToCounts(season, seasonKey, won);
+        const weatherKey = resolveWeatherKey(details?.weather);
+        if (weatherKey) addToCounts(weather, weatherKey, won);
+        const groundKey = resolveTrackConditionKey(details?.condition);
+        if (groundKey) addToCounts(ground, groundKey, won);
+
+        let parfait = parfaitBySession.get(session.id);
+        if (parfait === undefined) {
+            parfait = isParfaitSession(session);
+            parfaitBySession.set(session.id, parfait);
+        }
+        round.playerUmas.forEach((player) => {
+            if (options?.buildKey !== undefined && player.buildKey !== options.buildKey) return;
+            const moodKey = String(player.motivation);
+            const umaWon = player.finishOrder === 1;
+            addToCounts(mood, moodKey, umaWon);
+            if (!parfait) addToCounts(moodWithoutParfaits, moodKey, umaWon);
+        });
+    });
+
+    return {
+        standardDistanceDistribution: toSlices(STANDARD_DISTANCE_META, standard),
+        turnDistribution: toSlices(TURN_META, turn),
+        conditions: {
+            season: toSlices(SEASON_META, season),
+            weather: toSlices(WEATHER_META, weather),
+            trackCondition: toSlices(TRACK_CONDITION_META, ground),
+            mood: toSlices(MOOD_META, mood),
+            moodWithoutParfaits: toSlices(MOOD_META, moodWithoutParfaits),
+            parfaitSessions: Array.from(parfaitBySession.values()).filter(Boolean).length,
+        },
+    };
 }
 
 function styleCompositionKey(umas: UmaEntry[]): string {
@@ -609,6 +725,9 @@ export function aggregateStats(
 
     const matchups = buildMatchups(sessions, options);
     const trackMatchups = buildTrackMatchups(sessions, options);
+    const trackLocationMatchups = buildTrackLocationMatchups(sessions, options);
+    const distanceMatchups = buildDistanceMatchups(sessions, options);
+    const raceDistributions = buildRaceDistributions(sessions, options);
     const filteredSessions = sessions.filter((s) => s.rounds.some((r) => rounds.includes(r)));
     const rosterScopeDistance = options?.distanceType
         ?? (options?.buildKey !== undefined
@@ -724,6 +843,9 @@ export function aggregateStats(
         whiteActivations: summarize(whiteActsByRound),
         matchups,
         trackMatchups,
+        trackLocationMatchups,
+        distanceMatchups,
+        ...raceDistributions,
         styleMatchups: buildStyleMatchups(rounds),
         styleSaturation: options?.buildKey !== undefined
             ? buildStyleSaturation(rounds, options.buildKey)

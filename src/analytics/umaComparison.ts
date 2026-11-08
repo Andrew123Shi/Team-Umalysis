@@ -31,6 +31,8 @@ function emptyBreakdown(): ScoreBreakdownSummary {
         avgGoodLatePositionBonus: 0,
         strongStartRate: 0,
         avgStrongStartBonus: 0,
+        avgPopularity: 0,
+        popularityCount: 0,
         longShotRate: 0,
         avgLongShotBonus: 0,
         avgRegularSkillActivations: 0,
@@ -49,6 +51,15 @@ function emptyBreakdown(): ScoreBreakdownSummary {
         avgRushedDurationSeconds: 0,
         avgRushedDurationPenalty: 0,
         rushedDurationCount: 0,
+        uniqueStyleRate: 0,
+        distributions: {
+            finishPosition: { result: [], points: [] },
+            winMargin: { result: [], points: [] },
+            popularity: { result: [] },
+            goldSkills: { result: [], points: [] },
+            regularSkills: { result: [], points: [] },
+            rushedDuration: { result: [], points: [] },
+        },
     };
 }
 

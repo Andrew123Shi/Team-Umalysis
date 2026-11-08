@@ -1,8 +1,8 @@
-import { Button, ButtonGroup, OverlayTrigger, Tooltip } from 'react-bootstrap';
-import { useEffect, useState } from 'react';
+import { Button, ButtonGroup, Form, OverlayTrigger, Tooltip } from 'react-bootstrap';
+import { useEffect, useId, useState } from 'react';
 import type { ReactNode } from 'react';
 
-import type { AggregatedStats, TTRound, UmaEntry } from '../analytics/types';
+import type { AggregatedStats, TrackMatchupEntry, TTRound, UmaEntry } from '../analytics/types';
 
 import SectionHeading from './SectionHeading';
 import { useLoadingRemainingFiles } from './RemainingFilesLoadingAlert';
@@ -27,9 +27,21 @@ import { formatScore } from '../utils/formatScore';
 import { AnimatedText } from './AnimatedNumber';
 
 import StyleCompositionChart from './charts/StyleCompositionChart';
+import DistributionPie from './charts/DistributionPie';
+import {
+    distanceBarColor,
+    MOOD_META,
+    SEASON_META,
+    STANDARD_DISTANCE_META,
+    TRACK_CONDITION_META,
+    TURN_META,
+    WEATHER_META,
+} from '../analytics/raceConditions';
+
+const distanceRowColor = (entry: TrackMatchupEntry) => distanceBarColor(entry.id);
 
 export type StatsScope = 'recent' | 'overall';
-type OverviewSectionKey = 'summary' | 'progression' | 'opponentCharacteristics' | 'skill' | 'racetrack' | 'uma';
+type OverviewSectionKey = 'summary' | 'progression' | 'opponentCharacteristics' | 'skill' | 'racetrack' | 'condition' | 'uma';
 type OverviewSectionScopes = Record<OverviewSectionKey, StatsScope>;
 
 const DEFAULT_OVERVIEW_SECTION_SCOPES: OverviewSectionScopes = {
@@ -38,6 +50,7 @@ const DEFAULT_OVERVIEW_SECTION_SCOPES: OverviewSectionScopes = {
     opponentCharacteristics: 'recent',
     skill: 'recent',
     racetrack: 'recent',
+    condition: 'recent',
     uma: 'recent',
 };
 
@@ -200,6 +213,8 @@ export default function StatsPanels({
     const [overviewSectionScopes, setOverviewSectionScopes] = useState<OverviewSectionScopes>(
         DEFAULT_OVERVIEW_SECTION_SCOPES,
     );
+    const [includeParfaits, setIncludeParfaits] = useState(true);
+    const parfaitSwitchId = useId();
     const loadingRemaining = useLoadingRemainingFiles();
     useEffect(() => {
         if (!loadingRemaining) return;
@@ -244,7 +259,10 @@ export default function StatsPanels({
     const opponentCharacteristicsStats = overviewStatsFor('opponentCharacteristics');
     const skillStats = overviewStatsFor('skill');
     const racetrackStats = overviewStatsFor('racetrack');
+    const conditionStats = overviewStatsFor('condition');
     const umaStats = overviewStatsFor('uma');
+    const { conditions } = conditionStats;
+    const moodSlices = includeParfaits ? conditions.mood : conditions.moodWithoutParfaits;
 
     return (
 
@@ -399,17 +417,83 @@ export default function StatsPanels({
                         entries={racetrackStats.trackMatchups}
                         title="Relative Overperformance"
                         variant="track"
+                        nameColumnLabel="Course"
                         defaultSortKey="avgNormalizedScore"
                     />
                     <MatchupTable
                         entries={racetrackStats.trackMatchups}
                         title="Relative Underperformance"
                         variant="track"
+                        nameColumnLabel="Course"
                         defaultSortKey="avgNormalizedScore"
                         defaultSortDir="asc"
                     />
+                    {!isUmaView && (
+                        <>
+                            <MatchupTable
+                                entries={racetrackStats.trackLocationMatchups}
+                                title="Racetracks"
+                                variant="track"
+                                defaultSortKey="appearances"
+                                defaultSortDir="desc"
+                            />
+                            <MatchupTable
+                                entries={racetrackStats.distanceMatchups}
+                                title="Distances"
+                                variant="track"
+                                nameColumnLabel="Distance"
+                                defaultSortKey="appearances"
+                                defaultSortDir="desc"
+                                trackColor={distanceRowColor}
+                            />
+                            <DistributionPie
+                                title="Direction"
+                                slices={racetrackStats.turnDistribution}
+                                meta={TURN_META}
+                                centerKey="right"
+                            />
+                            <DistributionPie
+                                title="Standard vs Non-Standard"
+                                slices={racetrackStats.standardDistanceDistribution}
+                                meta={STANDARD_DISTANCE_META}
+                                centerKey="standard"
+                            />
+                        </>
+                    )}
                 </div>
             </AnalyticsSection>
+
+            {!isUmaView && (
+                <AnalyticsSection
+                    showHeader={showSectionHeaders}
+                    title="Condition Analysis"
+                    actions={overviewActionsFor('condition')}
+                >
+                    <div className="layout-grid is-4">
+                        <DistributionPie title="Season" slices={conditions.season} meta={SEASON_META} />
+                        <DistributionPie title="Track Condition" slices={conditions.trackCondition} meta={TRACK_CONDITION_META} />
+                        <DistributionPie title="Weather" slices={conditions.weather} meta={WEATHER_META} />
+                        <DistributionPie
+                            title="Mood"
+                            slices={moodSlices}
+                            meta={MOOD_META}
+                            countLabel="Umas"
+                            actions={(
+                                <div className="chart-tools">
+                                    <Form.Check
+                                        type="switch"
+                                        id={parfaitSwitchId}
+                                        label="Parfaits"
+                                        checked={includeParfaits}
+                                        onChange={(event) => setIncludeParfaits(event.target.checked)}
+                                        className="chart-switch"
+                                    />
+                                </div>
+                            )}
+                        />
+                    </div>
+                </AnalyticsSection>
+            )}
 
             <AnalyticsSection
                 showHeader={showSectionHeaders}

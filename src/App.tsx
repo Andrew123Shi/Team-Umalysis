@@ -55,7 +55,7 @@ function AppHeader() {
                 <Link to="/" className="app-brand">
                     <img src={`${baseUrl}icon.ico`} alt="" className="app-brand-mark" aria-hidden="true" />
                     <span className="app-brand-text">Team Umalysis</span>
-                    <span className="app-brand-badge">v2.0</span>
+                    <span className="app-brand-badge">v2.1</span>
                 </Link>
                 <nav className="app-nav" aria-label="Primary">
                     {NAV_ITEMS.map((item) => (

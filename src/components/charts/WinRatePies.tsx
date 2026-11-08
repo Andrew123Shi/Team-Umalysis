@@ -22,18 +22,20 @@ export function pctLabel(value: number): string {
     return `${clampPct(value).toFixed(1)}%`;
 }
 
-type RingSegment = {
+export type RingSegment = {
     label: string;
     /** Percentage 0–100 of the ring this segment occupies. */
     value: number;
     /** Value shown in the hover tooltip when it differs from the arc length (cumulative rates). */
     tooltipValue?: number;
+    detail?: string;
     color: string;
 };
 
 type RingTooltip = {
     label: string;
     value: number;
+    detail?: string;
     color: string;
     x: number;
     y: number;
@@ -54,6 +56,7 @@ function RingSvg({ segments }: { segments: RingSegment[] }) {
         setTooltip({
             label: segment.label,
             value: segment.tooltipValue ?? segment.value,
+            detail: segment.detail,
             color: segment.color,
             x: event.clientX + 14,
             y: event.clientY + 14,
@@ -95,6 +98,7 @@ function RingSvg({ segments }: { segments: RingSegment[] }) {
                     <span className="ring-tooltip-dot" />
                     <span>{tooltip.label}</span>
                     <strong>{tooltip.value.toFixed(1)}%</strong>
+                    {tooltip.detail && <span className="ring-tooltip-detail">{tooltip.detail}</span>}
                 </div>,
                 document.body,
             )}
@@ -106,13 +110,15 @@ function RingSvg({ segments }: { segments: RingSegment[] }) {
  * Square ring whose center text is sized in container units, so the number
  * stays centered and inside the hole at any rendered size.
  */
-function Ring({
+export function ShareRing({
     segments,
     value,
+    caption,
     size = 'md',
 }: {
     segments: RingSegment[];
     value: string;
+    caption?: string;
     size?: 'sm' | 'md';
 }) {
     return (
@@ -120,6 +126,7 @@ function Ring({
             <RingSvg segments={segments} />
             <div className="ring-core">
                 <span className="ring-value"><AnimatedText text={value} /></span>
+                {caption && <span className="ring-caption">{caption}</span>}
             </div>
         </div>
     );
@@ -136,7 +143,7 @@ export function WinRateDonut({
 }) {
     const winPct = clampPct(value);
     return (
-        <Ring
+        <ShareRing
             size={size}
             value={pctLabel(value)}
             segments={[
@@ -158,7 +165,7 @@ export function TeamPlacementRings({
     const allPlacedPct = Math.max(allPodiumPct, clampPct(allPlacedRate));
 
     return (
-        <Ring
+        <ShareRing
             value={pctLabel(allPlacedRate)}
             segments={[
                 { label: 'All Podiumed (1st/2nd/3rd)', value: allPodiumPct, color: OUTCOME_COLORS.podium },
@@ -183,7 +190,7 @@ export function WinRateRings({
     const top3Pct = Math.max(top2Pct, clampPct(top3Rate));
 
     return (
-        <Ring
+        <ShareRing
             value={pctLabel(winRate)}
             segments={[
                 { label: 'Wins', value: winPct, color: OUTCOME_COLORS.win },

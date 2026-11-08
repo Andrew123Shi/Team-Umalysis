@@ -96,7 +96,8 @@ function UmaRosterMetrics({ uma, scoreDomain }: { uma: RosterUmaSlot; scoreDomai
                     label="Pos"
                     summary={placement}
                     format={formatPosition}
-                    tip={rangeTip('Finishing Position', placement, formatPosition, {
+                    tip={rangeTip('Finish Position', placement, formatPosition, {
+                        color: '#34d399',
                         minLabel: 'Best',
                         maxLabel: 'Worst',
                         avgFormat: (value) => value.toFixed(2),

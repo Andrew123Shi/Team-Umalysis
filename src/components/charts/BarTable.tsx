@@ -29,6 +29,7 @@ function SortHeader({
     label,
     title,
     active,
+    measured = false,
     sortDir,
     align,
     onClick,
@@ -36,6 +37,7 @@ function SortHeader({
     label: string;
     title?: string;
     active: boolean;
+    measured?: boolean;
     sortDir: SortDir;
     align: 'start' | 'end';
     onClick: () => void;
@@ -48,7 +50,7 @@ function SortHeader({
             role="columnheader"
             aria-sort={active ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
             aria-label={title}
-            className={`bar-sort${active ? ' is-active' : ''}${align === 'end' ? ' is-end' : ''}`}
+            className={`bar-sort${active ? ' is-active' : ''}${measured && !active ? ' is-measured' : ''}${align === 'end' ? ' is-end' : ''}`}
             onClick={onClick}
             {...bind(title && title.toLowerCase() !== label.toLowerCase() ? { head: title } : undefined)}
         >
@@ -118,6 +120,7 @@ export default function BarTable<N extends string, K extends string>({
     rows,
     sortKey,
     sortDir,
+    barKey,
     onSort,
     emptyText = 'No data',
     className = '',
@@ -130,6 +133,8 @@ export default function BarTable<N extends string, K extends string>({
     rows: BarRow<K>[];
     sortKey: N | K;
     sortDir: SortDir;
+    /** Column the bar lengths follow, highlighted like the sorted column. Defaults to the sort column. */
+    barKey?: K;
     onSort: (key: N | K) => void;
     emptyText?: string;
     className?: string;
@@ -163,6 +168,7 @@ export default function BarTable<N extends string, K extends string>({
                             label={column.label}
                             title={column.title}
                             active={sortKey === column.key}
+                            measured={barKey === column.key}
                             sortDir={sortDir}
                             align="end"
                             onClick={() => onSort(column.key)}
@@ -193,7 +199,7 @@ export default function BarTable<N extends string, K extends string>({
                                     <span
                                         key={column.key}
                                         role="cell"
-                                        className={`bar-cell-value${sortKey === column.key ? ' is-active' : ''}`}
+                                        className={`bar-cell-value${(barKey ?? sortKey) === column.key ? ' is-active' : ''}`}
                                     >
                                         <AnimatedText text={row.values[column.key] ?? ''} />
                                     </span>
